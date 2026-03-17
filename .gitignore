@@ -1,0 +1,64 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+# For Python 3.13 onwards, venv might automatically create a .gitignore with '*' inside it, but
+# explicitly ignoring the folder name is good practice for compatibility.
+
+# Environment variables
+.env
+.env.*
+# .env.example should NOT be ignored, as it helps collaborators understand
+# required variables.
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+
+# IDE specific files (optional, uncomment as needed)
+# .idea/       # For PyCharm
+# .vscode/     # For VS Code
+# .DS_Store    # For macOS
+# Thumbs.db    # For Windows
+
+# Python specific files
+*.log
+# migrations/ # Generally, keep migration files tracked, unless using SQLite in specific scenarios.
+
+#model.args
+checkpoints/
+*.args
+*.tokenizer
+*.config
+*.state_dict
