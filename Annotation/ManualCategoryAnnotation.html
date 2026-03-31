@@ -906,8 +906,34 @@ new Vue({
             await this.exportReviews(this.savedReviews);
         },
         
+        // Export reviews to files
         async exportReviews(reviews) {
             try {
+                // Форматируем данные как в оригинальной функции
+                let apcLines = [];
+                
+                reviews.forEach(review => {
+                    review.rvarr.forEach((item, idx) => {
+                        if (item.aspect && item.sentiment) {
+                            let words = review.rvarr.map(w => w.tk);
+                            words[idx] = "$T$";
+                            
+                            let sentence = words.map((w, i) => 
+                                i === 0 ? w : ' ' + w
+                            ).join('');
+                            
+                            apcLines.push(sentence);
+                            apcLines.push(item.tk);
+                            
+                            let sentiment = item.sentiment === "Pos" ? "Positive" :
+                                        item.sentiment === "Neu" ? "Neutral" : "Negative";
+                            apcLines.push(sentiment);
+                            apcLines.push("");
+                        }
+                    });
+                });
+                
+                // Форматируем данные для отправки на сервер
                 let jsonformat = [];
                 reviews.forEach(review => {
                     let new_review = [];
@@ -932,13 +958,14 @@ new Vue({
                     jsonformat.push(new_review);
                 });
                 
+                // Формируем данные в требуемом формате
                 const requestData = {
                     data: jsonformat,
-                    domain: this.currentDomain
+                    domain:this.formData.domain
                 };
                 
-                console.log('Отправка аннотированных данных на сервер:', requestData);
-                
+                console.log('Отправка данных на сервер:', requestData);
+                // Отправляем данные на сервер
                 const response = await fetch('http://127.0.0.1:8000/save-reviews', {
                     method: 'POST',
                     headers: {
@@ -946,28 +973,34 @@ new Vue({
                     },
                     body: JSON.stringify(requestData)
                 });
-                
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
                 const result = await response.json();
                 console.log('Ответ сервера:', result);
                 
-                alert(`✅ Успешно отправлено ${reviews.length} аннотированных отзывов на сервер`);
+                alert(`Успешно отправлено ${reviews.length} отзывов на сервер`);
                 
-                // Очищаем сохраненные отзывы после успешной отправки
-                this.savedReviews = [];
-                this.savedCount = 0;
+                return {
+                    success: true,
+                    count: reviews.length,
+                    serverResponse: result
+                };
                 
             } catch (err) {
                 console.error('Ошибка при отправке на сервер:', err);
                 
+                // Более информативное сообщение об ошибке
                 if (err.message.includes('Failed to fetch')) {
                     alert(`❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен по адресу http://127.0.0.1:8000`);
                 } else {
                     alert(`❌ Ошибка при отправке данных: ${err.message}`);
                 }
+                
+                return {
+                    success: false,
+                    error: err.message
+                };
             }
         },
         
