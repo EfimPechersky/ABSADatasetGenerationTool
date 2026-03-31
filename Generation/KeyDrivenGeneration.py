@@ -7,22 +7,24 @@ from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
 import random
+"""Модуль для генерации примеров с нуля"""
 class KeyDrivenGenerator:
     __aspects={}
     __categories=[]
     __opinions={}
     generated_examples=[]
     model:LLM
+
     def __init__(self):
         self.__aspects={}
         self.__opinions={}
         self.__categories=[]
         self.generated_examples={}
         self.model=LLM()
+    """Категории"""
     @property
     def categories(self):
         return self.__categories
-    
     @categories.setter
     def categories(self, value):
         if isinstance(value,list):
@@ -32,12 +34,14 @@ class KeyDrivenGenerator:
         else:
             raise argument_exception("Wrong type of categories!")
     
+    """Добавить категорию"""
     def add_category(self, value):
         if isinstance(value,str):
             self.__categories.append(value)
         else:
             raise argument_exception(f"Wrong type of category '{value}'!")
-            
+    
+    """Генерация аспектов"""
     def generate_aspects(self, domain):
         for i in self.__categories:
             asp=Prompts.prompt_AspectTerm(domain,i)
@@ -48,6 +52,7 @@ class KeyDrivenGenerator:
             lst=lst.replace("'",'"')
             self.__aspects[i]=json.loads(lst)
     
+    """Генерация мнений"""
     def generate_opinions(self, domain):
         for i in self.__categories:
             ops=Prompts.prompt_OpinionTerm(domain,i)
@@ -62,6 +67,7 @@ class KeyDrivenGenerator:
             print(lst)
             self.__opinions[i]=json.loads(lst)
     
+    """Генерация примеров"""
     def generate_samples(self, domain, examples):
         for category in self.__categories:
             self.generated_examples[category]=[]
@@ -80,6 +86,7 @@ class KeyDrivenGenerator:
                 except:
                     continue
     
+    """Конвертация из xml"""
     def from_xml(xml):
         if "<samples>" in xml:
             text_to_convert=xml[xml.index("<samples>"):xml.index("</samples>")+10].replace('"', ' ')
@@ -92,6 +99,7 @@ class KeyDrivenGenerator:
             dct["samples"]=dct["samples"]["sample"]
         return dct
 
+    """Генерация примеров с нуля"""
     def generate_examples(self, domain,examples,categories=[]):
         if categories!=[]:
             self.categories=categories
