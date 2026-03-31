@@ -77,8 +77,8 @@ class Dataset:
                         print(all_dats[i][j])
                         all_dats[i][j][2]="Neutral"
         text=""
-        for i in range(0,len(all_dats)-1):
-            for j in range(0,len(all_dats[i])-1):
+        for i in range(0,len(all_dats)):
+            for j in range(0,len(all_dats[i])):
                 text+=" ".join(all_dats[i][j])
                 text+='\n'
             text+='\n'

@@ -9,7 +9,12 @@ class event_type:
     @staticmethod
     def saved_dataset() -> str:
         return "New annotated dataset was saved"
-
+    """
+    Событие - сохранение нового датасета
+    """
+    @staticmethod
+    def saved_dataset() -> str:
+        return "New annotated dataset was saved"
     """
     Получить список всех событий
     """

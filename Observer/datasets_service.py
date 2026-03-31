@@ -3,6 +3,7 @@ from Generation.Full_generation import SamplesGenerator
 from Observer.event_type import event_type
 from FileManager.FileManager import FileManager
 from DatasetModels.DatasetModel import Dataset
+from Generation.KeyDrivenGeneration import KeyDrivenGenerator
 import os
 """Класс следящий за появлением новых датасетов"""
 class datasets_service():

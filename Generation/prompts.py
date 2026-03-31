@@ -134,3 +134,75 @@ class Prompts:
         Examples:
         {examples}
         '''
+
+    def prompt_AspectTerm(domain, category):
+        # brainstorm aspect terms
+        prompt = (
+            f"Brainstorm a list of commonly used aspect terms on Russian Language for the aspect category **{category}** within the **{domain}** domain.\n"
+            "\n"
+            f"Please adhere to the following guidelines:\n"
+            f"  - Aspect terms should cover various potential things that opinions can be expressed about within the corresponding category.\n"
+            "  - Aspect terms are fine-grained and concrete things.\n"
+            "  - Aspect terms are single or multiword terms naming particular aspects of the target entity.\n"
+            "  - Don't write any preamble, comments or explanations, just Python list!\n"
+            f"  - Generated aspects should be associated only with category {category}!\n"
+            f"  - Generate no more than 20 aspects!\n"
+            "\n"
+            f"Your output should be a Python list of strings, with each element being an aspect term."
+            "Begin generation directly with python list without any preamble."
+        )
+        return prompt
+
+    def prompt_OpinionTerm(domain, category):
+        # brainstorm opinion terms
+        prompt = (
+            f"Brainstorm a list of commonly used opinion terms on Russian Language for the aspect category **{category}** within the **{domain}** domain.\n"
+            "\n"
+            f"Please adhere to the following guidelines:\n"
+            "  - Opinion terms refer to the expression carrying subjective emotions.\n"
+            "  - Provide diverse words and phrases covering positive, negative, and neutral sentiments.\n"
+            "  - Write sentiment on English language, only 'positive', 'negative', or 'neutral'"
+            "  - Don't write any preamble, comments or explanations, just Python list!\n"
+            f"  - Generated opinions should be associated only with category {category}!\n"
+            f"  - Generate no more than 20 opinions!\n"
+            "\n"
+            "Your output should be a Python list of lists, with each element being an [opinion, sentiment] pair."
+            "Begin generation directly with python list without any preamble."
+        )
+
+        return prompt
+
+    # *********************************************************************************************************************
+
+    '''
+    Attributed Prompts in Key-Point-Driven Synthesis
+    '''
+
+    def generate_prompt(domain,aspect,category,opinion,sentiment,example):
+        prompt = (f'''Write 3 review sentences for the {domain}, WRITE TEXT ON RUSSIAN LANGUAGE
+        Requirements:
+        - Keep a consistent style and annotation standard with the examples.
+        - Mention the aspect term '{aspect}', BUT DONT CHANGE ASPECT AND QUOTE VERBATIM.
+        - Use opinion term '{opinion}'.
+        - Express {sentiment} across aspects.
+        - Begin generation directly with <sample> without any preamble.
+        - Don't write explanations or comments!
+        WRITE GENERATED SENTENCES ONLY IN THIS XML FORMAT:
+        <samples>
+            <sample>
+                "sentence1"
+            </sample>
+            <sample>
+                "sentence2"
+            </sample>
+            <sample>
+                "sentence1"
+            </sample>
+            <sample>
+                "sentence3"
+            </sample>
+        </samples>
+        Example:
+        {example}
+        ''')
+        return prompt

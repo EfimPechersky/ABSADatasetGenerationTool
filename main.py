@@ -7,7 +7,7 @@ from Observer.datasets_service import datasets_service
 from Observer.event_type import event_type
 from Model.LLM import LLM
 from datetime import datetime
-
+from Generation.KeyDrivenGeneration import KeyDrivenGenerator
 
 obs=observe_service()
 das=datasets_service()
@@ -27,6 +27,17 @@ app.add_middleware(
 async def options_save_reviews():
     return {}
 SAVE_DIR = "./Datasets/"
+@app.post("/test_generate_examples")
+async def test_generate_examples(request: Request):
+    return {"status":"success","examples":{"food":["Качество еды оставляет желать лучшего.","Блюда были недостаточно горячие, когда их принесли.","Общее впечатление от ужина было отрицательным."],"service":["Интерьер ресторана создает уютную атмосферу, а управление ожиданием было на высшем уровне, благодаря отличному обслуживанию.","Кухня впечатляет разнообразием блюд, и стоит отметить, что управление ожиданием не омрачило вечер, благодаря отличному обслуживанию.","Персонал проявил себя с лучшей стороны, обеспечивая быстрое обслуживание и комфортное управление ожиданием, что в сочетании с отличным обслуживанием сделало наш визит незабываемым."]}}
+@app.post("/generate_examples")
+async def generate_examples(request: Request):
+    data = await request.json()
+    print(data)
+    KDG=KeyDrivenGenerator()
+    KDG.generate_examples(data["domain"], data["examples"], data["categories"])
+    print(KDG.generated_examples)
+    return {"status": "success", "examples":KDG.generated_examples}
 @app.post("/save-reviews")
 async def save_reviews(request: Request):
     #try:
