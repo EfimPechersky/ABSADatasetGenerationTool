@@ -12,7 +12,7 @@ from Generation.KeyDrivenGeneration import KeyDrivenGenerator
 obs=observe_service()
 das=datasets_service()
 model=LLM()
-model.apiurl=""
+model.apiurl="https://sad-ducks-shop.loca.lt"
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +45,7 @@ async def generate_examples(request: Request):
 async def save_reviews(request: Request):
     #try:
     data = await request.json()
+    print(data)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     new_dir=SAVE_DIR+f"d{timestamp}/"
     os.makedirs(new_dir, exist_ok="True")

@@ -934,13 +934,12 @@ new Vue({
                 
                 const requestData = {
                     data: jsonformat,
-                    domain: this.currentDomain,
-                    categories: this.categories.map(c => c.value)
+                    domain: this.currentDomain
                 };
                 
                 console.log('Отправка аннотированных данных на сервер:', requestData);
                 
-                const response = await fetch('http://127.0.0.1:8000/save-annotations', {
+                const response = await fetch('http://127.0.0.1:8000/save-reviews', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

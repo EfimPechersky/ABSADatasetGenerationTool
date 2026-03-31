@@ -161,6 +161,7 @@ class Prompts:
             f"Please adhere to the following guidelines:\n"
             "  - Opinion terms refer to the expression carrying subjective emotions.\n"
             "  - Provide diverse words and phrases covering positive, negative, and neutral sentiments.\n"
+            "  - Number of positive, negative and neutral opinions should be equal!!!\n"
             "  - Write sentiment on English language, only 'positive', 'negative', or 'neutral'"
             "  - Don't write any preamble, comments or explanations, just Python list!\n"
             f"  - Generated opinions should be associated only with category {category}!\n"
