@@ -1,0 +1,387 @@
+<!-- page2.html - Диаграмма обучения модели -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаг 2: Обучение модели | Инструмент аннотации</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js для графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 1000px; margin: 0 auto; }
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .training-container { text-align: center; }
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        canvas {
+            max-height: 400px;
+            width: 100%;
+        }
+        .metrics-summary {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+        .metric-card h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            opacity: 0.9;
+        }
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .progress-status {
+            font-size: 16px;
+            color: #666;
+            margin: 20px 0;
+            padding: 10px;
+            background: #e8f0fe;
+            border-radius: 10px;
+        }
+        .error-global {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .badge-epoche {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <div class="form-card">
+            <div class="training-container">
+                <div class="spinner" v-if="!isTrainingComplete"></div>
+                <h3 v-if="!isTrainingComplete">Обучение модели</h3>
+                <h3 v-else>Обучение завершено!</h3>
+                
+                <!-- Диаграмма с тремя графиками -->
+                <div class="chart-container" v-if="chartData.labels.length > 0">
+                    <div class="badge-epoche">
+                        <i class="bi bi-graph-up"></i> Эпохи: {{ chartData.labels.length }}
+                    </div>
+                    <canvas id="trainingChart"></canvas>
+                    
+                    <!-- Легенда -->
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FF6384;"></div>
+                            <span>APC-ACC</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #36A2EB;"></div>
+                            <span>APC-F1</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FFCE56;"></div>
+                            <span>ATE-F1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Сводка метрик -->
+                <div class="metrics-summary" v-if="latestMetrics">
+                    <div class="metric-card">
+                        <h4><i class="bi bi-graph-down"></i> APC-ACC</h4>
+                        <div class="value">{{ latestMetrics.apcacc?.toFixed(4) || '—' }}</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4><i class="bi bi-graph-up"></i> APC-F1</h4>
+                        <div class="value">{{ latestMetrics.apcf1?.toFixed(4) || '—' }}</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4><i class="bi bi-check-circle"></i> ATE-F1</h4>
+                        <div class="value">{{ latestMetrics.atef1?.toFixed(4) || '—' }}</div>
+                    </div>
+                </div>
+
+                <!-- Статус обучения -->
+                <div class="progress-status">
+                    <strong><i class="bi bi-info-circle"></i> Статус:</strong> {{ progressStatus }}
+                </div>
+                
+                <p class="text-muted mt-3">
+                    <small>Пожалуйста, подождите. Модель обучается на аннотированных примерах...</small>
+                </p>
+                <div v-if="errorMsg" class="error-global">{{ errorMsg }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+new Vue({
+    el: '#app',
+    data: {
+        processCode: null,
+        epochs: 0,
+        currentEpoch:0,
+        progressStatus: 'Начало обработки...',
+        pollingInterval: null,
+        errorMsg: '',
+        domain: '',
+        categories: [],
+        generatedExamples: null,
+        isTrainingComplete: false,
+        chartInstance: null,
+        chartData: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'APC-ACC',
+                    data: [],
+                    borderColor: '#FF6384',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'APC-F1',
+                    data: [],
+                    borderColor: '#36A2EB',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'ATE-F1',
+                    data: [],
+                    borderColor: '#FFCE56',
+                    backgroundColor: 'rgba(255, 206, 86, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        latestMetrics: null
+    },
+    mounted() {
+        const savedData = sessionStorage.getItem('trainData');
+        if (!savedData) {
+            this.errorMsg = 'Данные не найдены. Пожалуйста, начните с первой страницы.';
+            setTimeout(() => { window.location.href = 'page1.html'; }, 3000);
+            return;
+        }
+        const data = JSON.parse(savedData);
+        this.processCode = data.processCode;
+        this.epochs = data.epochs;
+        this.startPolling();
+    },
+    beforeDestroy() {
+        if (this.pollingInterval) clearInterval(this.pollingInterval);
+        if (this.chartInstance) this.chartInstance.destroy();
+    },
+    methods: {
+        startPolling() {
+            if (this.pollingInterval) clearInterval(this.pollingInterval);
+            this.pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`http://127.0.0.1:8000/get_train_model_status?code=${this.processCode}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const statusData = await response.json();
+                    console.log(statusData);
+                    this.progressStatus = statusData.status;
+                    
+                    // Обработка метрик обучения
+                    if (statusData.metrics && statusData.metrics.length > 0 && statusData.metrics.length>this.currentEpoch) {
+                        this.currentEpoch=statusData.metrics.length;
+                        this.updateChart(statusData.metrics);
+                    }
+                    
+                    if (statusData.status === 'Done') {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                        this.isTrainingComplete = true;
+                        this.progressStatus = 'Обучение завершено успешно!';
+                    }
+                    
+                    if (statusData.status === 'Error') {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                        this.errorMsg = `Ошибка при обучении модели: ${statusData.result || 'Неизвестная ошибка'}`;
+                    }
+                } catch (err) {
+                    console.error('Ошибка при опросе статуса:', err);
+                }
+            }, 10000);
+        },
+        
+        updateChart(metricsData) {
+            // Очищаем существующие данные
+            this.chartData.labels = [];
+            this.chartData.datasets[0].data = [];
+            this.chartData.datasets[1].data = [];
+            this.chartData.datasets[2].data = [];
+            // Заполняем данные из метрик
+            metricsData.forEach((metric, index) => {
+                this.chartData.labels.push(`Эпоха ${metric.epoch || index + 1}`);
+                this.chartData.datasets[0].data.push(metric["APC-ACC"] || 0);
+                this.chartData.datasets[1].data.push(metric["APC-F1"] || 0);
+                this.chartData.datasets[2].data.push(metric["ATE-F1"] || 0);
+            });
+            
+            // Обновляем последние метрики
+            if (metricsData.length > 0) {
+                const lastMetric = metricsData[metricsData.length - 1];
+                this.latestMetrics = {
+                    apcacc: lastMetric["APC-ACC"],
+                    apcf1: lastMetric["APC-F1"],
+                    atef1: lastMetric["ATE-F1"]
+                };
+            }
+            
+            // Перерисовываем график
+            this.renderChart();
+        },
+        
+        renderChart() {
+            const canvas = document.getElementById('trainingChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (this.chartInstance) {
+                this.chartInstance.destroy();
+            }
+            
+            this.chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: this.chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false // Скрываем встроенную легенду, используем свою
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    let value = context.raw;
+                                    return `${label}: ${value.toFixed(4)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Значения метрик',
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Эпохи',
+                                color: '#666'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+</body>
+</html>

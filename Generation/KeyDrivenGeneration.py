@@ -6,21 +6,25 @@ from DatasetModels.AspectModel import Aspect
 from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
+from Storage.Process_statuses import ProcessStatuses
 import random
 """Модуль для генерации примеров с нуля"""
 class KeyDrivenGenerator:
     __aspects={}
     __categories=[]
     __opinions={}
+    __code=0
     generated_examples=[]
     model:LLM
-
-    def __init__(self):
+    __PS:ProcessStatuses
+    def __init__(self, code):
+        self.__PS=ProcessStatuses()
         self.__aspects={}
         self.__opinions={}
         self.__categories=[]
         self.generated_examples={}
         self.model=LLM()
+        self.__code=code
     """Категории"""
     @property
     def categories(self):
@@ -51,6 +55,8 @@ class KeyDrivenGenerator:
             lst=lst.replace("\n", "")
             lst=lst.replace("'",'"')
             self.__aspects[i]=json.loads(lst)
+            progress=self.__PS.get_examples_generation_progress(self.__code)["progress"]+0.2/len(self.__categories)
+            self.__PS.change_examples_generation_progress(self.__code, "In progress", progress)
     
     """Генерация мнений"""
     def generate_opinions(self, domain):
@@ -66,14 +72,16 @@ class KeyDrivenGenerator:
             lst=lst[lst.index("["):lst.rindex("]")+1]
             print(lst)
             self.__opinions[i]=json.loads(lst)
+            progress=self.__PS.get_examples_generation_progress(self.__code)["progress"]+0.2/len(self.__categories)
+            self.__PS.change_examples_generation_progress(self.__code, "In progress", progress)
     
     """Генерация примеров"""
     def generate_samples(self, domain, examples):
+        examples_num=1
         for category in self.__categories:
             self.generated_examples[category]=[]
             count=0
-            while count<1:
-                count+=1
+            while count<examples_num:
                 aspect=self.__aspects[category][random.randint(0, len(self.__aspects[category])-1)]
                 opinion=self.__opinions[category][random.randint(0, len(self.__opinions[category])-1)]
                 gen_prompt = Prompts.generate_prompt(domain, aspect, category,opinion[0], opinion[1], examples[random.randint(0,len(examples)-1)])
@@ -83,8 +91,11 @@ class KeyDrivenGenerator:
                     js=KeyDrivenGenerator.from_xml(res)
                     self.generated_examples[category]+=js["samples"]
                     count+=1
+                    progress=self.__PS.get_examples_generation_progress(self.__code)["progress"]+0.6/(len(self.__categories)*examples_num)
+                    self.__PS.change_examples_generation_progress(self.__code, "In progress", progress)
                 except:
                     continue
+                
     
     """Конвертация из xml"""
     def from_xml(xml):
@@ -101,12 +112,17 @@ class KeyDrivenGenerator:
 
     """Генерация примеров с нуля"""
     def generate_examples(self, domain,examples,categories=[]):
-        if categories!=[]:
-            self.categories=categories
-        if self.categories==[]:
-            raise operation_exception("Categories are empty!")
-        self.generate_aspects(domain)
-        self.generate_opinions(domain)
-        self.generate_samples(domain, examples)
-        return self.generated_examples
+        try:
+            if categories!=[]:
+                self.categories=categories
+            if self.categories==[]:
+                raise operation_exception("Categories are empty!")
+            self.generate_aspects(domain)
+            self.generate_opinions(domain)
+            self.generate_samples(domain, examples)
+            self.__PS.change_examples_generation_progress(self.__code, "Done", 1.0, result=self.generated_examples)
+        except Exception as e:
+            self.__PS.change_examples_generation_progress(self.__code, "Error", 0.0)
+            raise operation_exception(f"{e}")
+        
         

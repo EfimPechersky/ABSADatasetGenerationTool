@@ -21,11 +21,10 @@ class datasets_service():
         if event == event_type.saved_dataset():
             data=FileManager.load_json(params["path_to_file"]+"annotated_reviews.json")
             dataset=Dataset.from_json(data)
-            print(dataset)
             dataset.domain=params["domain"]
-            self.__gen=SamplesGenerator(dataset)
+            code=params["code"]
+            self.__gen=SamplesGenerator(dataset, code)
             self.__gen.generate_dataset()
-            print(self.__gen.generated_dataset)
             os.makedirs(params["path_to_file"]+"dat", exist_ok="True")
             FileManager.save_json(params["path_to_file"]+"generated_dataset.json", self.__gen.generated_dataset.to_json())
             FileManager.save_dat(params["path_to_file"]+"dat/generated_dataset.train.dat.atepc", self.__gen.generated_dataset.to_dat())

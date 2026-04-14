@@ -1,0 +1,171 @@
+<!-- page2.html - Прогресс бар для генерации примеров -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаг 2: Генерация примеров | Инструмент аннотации</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 800px; margin: 0 auto; }
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .progress-container { text-align: center; padding: 40px; }
+        .progress-bar-custom {
+            width: 100%;
+            height: 30px;
+            background-color: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .progress-status { font-size: 16px; color: #666; margin-top: 15px; }
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-global {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <div class="form-card">
+            <div class="progress-container">
+                <div class="spinner"></div>
+                <h3>⏳ Генерация примеров на сервере</h3>
+                <div class="progress-bar-custom">
+                    <div class="progress-fill" :style="{ width: (progress * 100) + '%' }">
+                        {{ (progress * 100).toFixed(1) }}%
+                    </div>
+                </div>
+                <div class="progress-status">
+                    <strong>Статус:</strong> {{ progressStatus }}
+                </div>
+                <p class="text-muted mt-3">
+                    <small>Пожалуйста, подождите. Сервер генерирует примеры для аннотации...</small>
+                </p>
+                <div v-if="errorMsg" class="error-global">{{ errorMsg }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+new Vue({
+    el: '#app',
+    data: {
+        processCode: null,
+        progress: 0,
+        progressStatus: 'Начало обработки...',
+        pollingInterval: null,
+        errorMsg: '',
+        domain: '',
+        categories: [],
+        generatedExamples: null
+    },
+    mounted() {
+        const savedData = sessionStorage.getItem('generationData');
+        if (!savedData) {
+            this.errorMsg = 'Данные не найдены. Пожалуйста, начните с первой страницы.';
+            setTimeout(() => { window.location.href = 'page1.html'; }, 3000);
+            return;
+        }
+        const data = JSON.parse(savedData);
+        this.processCode = data.processCode;
+        this.domain = data.domain;
+        this.categories = data.categories;
+        this.startPolling();
+    },
+    beforeDestroy() {
+        if (this.pollingInterval) clearInterval(this.pollingInterval);
+    },
+    methods: {
+        startPolling() {
+            if (this.pollingInterval) clearInterval(this.pollingInterval);
+            this.pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`http://127.0.0.1:8000/get_examples_generation_status?code=${this.processCode}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const statusData = await response.json();
+                    this.progress = statusData.progress;
+                    this.progressStatus = statusData.status;
+                    
+                    if (statusData.status === 'Done' && statusData.result) {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                        // Сохраняем сгенерированные примеры и переходим к аннотации
+                        const annotationData = {
+                            generatedExamples: statusData.result,
+                            domain: this.domain,
+                            categories: this.categories
+                        };
+                        sessionStorage.setItem('annotationData', JSON.stringify(annotationData));
+                        window.location.href = 'AnnotationForm.html';
+                    }
+                    if (statusData.status === 'Error') {
+                        clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
+                        this.errorMsg = `Ошибка при генерации примеров: ${statusData.result || 'Неизвестная ошибка'}`;
+                    }
+                } catch (err) {
+                    console.error('Ошибка при опросе статуса:', err);
+                }
+            }, 2000);
+        }
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!-- page1.html - Форма для генерации примеров -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаг 1: Генерация примеров | Инструмент аннотации</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 800px; margin: 0 auto; }
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 14px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .categories-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .categories-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .categories-title { font-weight: 600; color: #333; font-size: 16px; }
+        .counter { font-size: 12px; color: #666; background: #e9ecef; padding: 4px 10px; border-radius: 20px; }
+        .categories-list { list-style: none; margin-bottom: 15px; }
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .category-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .category-input:focus { outline: none; border-color: #667eea; }
+        .delete-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .delete-btn:hover { background: #ff3838; transform: scale(1.05); }
+        .button-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-add { background: #28a745; color: white; flex: 1; }
+        .btn-add:hover:not(:disabled) { background: #218838; transform: translateY(-2px); }
+        .btn-add:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+        }
+        .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .error-message { color: #ff4757; font-size: 12px; margin-top: 5px; display: none; }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        .error-global {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .warning { color: #ffc107; font-size: 12px; margin-top: 8px; }
+        .file-upload-area {
+            border: 2px dashed #e0e0e0;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .file-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        .file-info { margin-top: 10px; font-size: 14px; color: #666; }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <div class="form-card">
+            <h1>📋 Шаг 3: Обучение модели</h1>
+            <p class="subtitle">Введите параметры обучения модели ИИ</p>
+            
+            <div class="form-group">
+                <label for="epochs">Количество эпох</label>
+                <input type="number" min="1" max="1000" id="epochs" v-model="formData.epochs" placeholder="Количество этапов обучения модели на датасете">
+            </div>
+            
+            <div class="form-group">
+                <label for="batch_size">Размер батча</label>
+                <input type="number" min="1" max="8" id="batch_size" v-model="formData.batch_size" placeholder="Размер батча примеров">
+            </div>
+            
+            <button class="btn btn-submit" @click="submitForm" :disabled="!isFormValid || isLoading">
+                <span v-if="isLoading" class="loading"></span>
+                <span v-else>Начать обучение модели</span>
+            </button>
+            
+            <div class="success-message" v-if="successMsg">{{ successMsg }}</div>
+            <div class="error-global" v-if="errorMsg">{{ errorMsg }}</div>
+        </div>
+    </div>
+</div>
+
+<script>
+var LZipper = function() { return { compress: function(r) { return r }, decompress: function(r) { return r } } }();
+
+new Vue({
+    el: '#app',
+    data: {
+        formData: { epochs: '', batch_size:'' },
+        isLoading: false,
+        successMsg: '',
+        errorMsg: ''
+    },
+    mounted() {
+        const savedData = sessionStorage.getItem('trainFormData');
+        if (!savedData) {
+            this.errorMsg = 'Данные не найдены. Пожалуйста, начните с первой страницы.';
+            setTimeout(() => { window.location.href = 'page1.html'; }, 3000);
+            return;
+        }
+        const data = JSON.parse(savedData);
+        this.code = data.code;
+    },
+    computed: {
+        isFormValid() {
+            return this.formData.epochs && this.formData.batch_size
+                   
+        }
+    },
+    methods: {
+        async submitForm() {
+            if (!this.isFormValid) {
+                this.errorMsg = 'Пожалуйста, заполните все поля';
+                setTimeout(() => { this.errorMsg = ''; }, 3000);
+                return;
+            }
+            this.isLoading = true;
+            this.errorMsg = '';
+            
+            const requestData = {
+                epochs: this.formData.epochs,
+                batch_size: this.formData.batch_size,
+                code: this.code
+            };
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/train_model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                
+                // Сохраняем данные в sessionStorage и переходим на страницу прогресса
+                const trainData = {
+                    processCode: result.code,
+                    epochs:this.formData.epochs
+                };
+                sessionStorage.setItem('trainData', JSON.stringify(trainData));
+                window.location.href = 'TrainModelProgress.html';
+                
+            } catch (err) {
+                if (err.message.includes('Failed to fetch')) {
+                    this.errorMsg = `❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен по адресу http://127.0.0.1:8000`;
+                } else {
+                    this.errorMsg = `❌ Ошибка при отправке данных: ${err.message}`;
+                }
+                this.isLoading = false;
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>
