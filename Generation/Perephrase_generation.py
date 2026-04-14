@@ -78,18 +78,21 @@ class PerephraseGenerator:
             self.__PS.change_dataset_generation_progress(self.__code,"In progress", progress)
         for ind in range(0,len(self.__all_samples)):
             new_aspects=[]
-            for aspect in self.__all_dasp[ind]:
-                try:
-                    indexes=find_russian_substring_simple(self.__all_samples[ind],aspect)
-                except:
-                    continue
-                if indexes==[]:
-                    continue
-                else:
-                    indexes=indexes[0]
-                new_asp=Aspect(self.__all_samples[ind][indexes[0]:indexes[1]],self.__all_dasp[ind][aspect][0].upper()+self.__all_dasp[ind][aspect][1:])
-                new_aspects+=[new_asp]
-            if len(new_aspects)>0:
-                new_samp=Sample(self.__all_samples[ind],new_aspects)
-                self.perephrase_dataset.add_sample(new_samp)
+            try:
+                for aspect in self.__all_dasp[ind]:
+                    try:
+                        indexes=find_russian_substring_simple(self.__all_samples[ind],aspect)
+                    except:
+                        continue
+                    if indexes==[]:
+                        continue
+                    else:
+                        indexes=indexes[0]
+                    new_asp=Aspect(self.__all_samples[ind][indexes[0]:indexes[1]],self.__all_dasp[ind][aspect][0].upper()+self.__all_dasp[ind][aspect][1:])
+                    new_aspects+=[new_asp]
+                if len(new_aspects)>0:
+                    new_samp=Sample(self.__all_samples[ind],new_aspects)
+                    self.perephrase_dataset.add_sample(new_samp)
+            except:
+                continue
             

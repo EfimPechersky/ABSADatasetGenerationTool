@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Шаг 4: Генерация датасета | Инструмент аннотации</title>
+    <title>Шаг 2: Генерация датасета</title>
     <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
     <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
@@ -151,7 +151,7 @@ new Vue({
         const savedData = sessionStorage.getItem('datasetData');
         if (!savedData) {
             this.errorMsg = 'Данные не найдены. Пожалуйста, начните с первой страницы.';
-            setTimeout(() => { window.location.href = 'page1.html'; }, 3000);
+            setTimeout(() => { window.location.href = 'GenerationForm.html'; }, 3000);
             return;
         }
         const data = JSON.parse(savedData);

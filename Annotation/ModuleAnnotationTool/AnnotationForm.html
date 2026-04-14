@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Шаг 3: Аннотация данных | Инструмент аннотации</title>
+    <title>Шаг 2: Аннотация данных</title>
     <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
@@ -282,7 +282,7 @@ new Vue({
         const savedData = sessionStorage.getItem('annotationData');
         if (!savedData) {
             alert('Данные не найдены. Пожалуйста, начните с первой страницы.');
-            window.location.href = 'page1.html';
+            window.location.href = 'GenerationForm.html';
             return;
         }
         const data = JSON.parse(savedData);

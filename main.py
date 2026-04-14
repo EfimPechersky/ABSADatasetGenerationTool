@@ -20,7 +20,7 @@ def generate_code():
 obs = observe_service()
 das = datasets_service()
 model = LLM()
-model.apiurl = "https://thin-files-sing.loca.lt"
+model.apiurl = "https://rotten-spies-bake.loca.lt"
 
 app = FastAPI()
 

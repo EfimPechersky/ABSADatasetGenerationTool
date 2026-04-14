@@ -1,6 +1,7 @@
 import json
 from custom_exceptions import argument_exception, operation_exception
 from DatasetModels.SampleModel import Sample
+from DatasetModels.AspectModel import Aspect
 """Класс, описывающий датасет"""
 class Dataset:
     __samples:list
@@ -83,7 +84,15 @@ class Dataset:
                 text+='\n'
             text+='\n'
         return text
-    
+
+    @staticmethod
+    def template_dataset():
+        pos_sample=Sample(review="Отличные товары!", aspects=[Aspect("товары", "Positive")])
+        neg_sample=Sample(review="Ужасные товары!", aspects=[Aspect("товары", "Negative")])
+        neu_sample=Sample(review="Нормальные товары.", aspects=[Aspect("товары", "Neutral")])
+        dt=Dataset("products", [pos_sample, neg_sample, neu_sample])
+        return dt
+
     """Строковое представление датасета"""
     def __str__(self):
         return f"{self.to_json()}"

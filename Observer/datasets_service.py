@@ -28,4 +28,5 @@ class datasets_service():
             os.makedirs(params["path_to_file"]+"dat", exist_ok="True")
             FileManager.save_json(params["path_to_file"]+"generated_dataset.json", self.__gen.generated_dataset.to_json())
             FileManager.save_dat(params["path_to_file"]+"dat/generated_dataset.train.dat.atepc", self.__gen.generated_dataset.to_dat())
+            dataset.samples=dataset.samples+Dataset.template_dataset().samples
             FileManager.save_dat(params["path_to_file"]+"dat/annotated_dataset.test.dat.atepc", dataset.to_dat())
