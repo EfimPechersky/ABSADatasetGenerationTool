@@ -5,6 +5,7 @@ from FileManager.FileManager import FileManager
 from DatasetModels.DatasetModel import Dataset
 from Generation.KeyDrivenGeneration import KeyDrivenGenerator
 import os
+from Storage.DatabaseManager import DatabaseManager
 """Класс следящий за появлением новых датасетов"""
 class datasets_service():
 
@@ -22,11 +23,13 @@ class datasets_service():
             data=FileManager.load_json(params["path_to_file"]+"annotated_reviews.json")
             dataset=Dataset.from_json(data)
             dataset.domain=params["domain"]
-            code=params["code"]
-            self.__gen=SamplesGenerator(dataset, code)
+            project_id=params["project_id"]
+            self.__gen=SamplesGenerator(dataset, project_id)
             self.__gen.generate_dataset()
             os.makedirs(params["path_to_file"]+"dat", exist_ok="True")
             FileManager.save_json(params["path_to_file"]+"generated_dataset.json", self.__gen.generated_dataset.to_json())
             FileManager.save_dat(params["path_to_file"]+"dat/generated_dataset.train.dat.atepc", self.__gen.generated_dataset.to_dat())
             dataset.samples=dataset.samples+Dataset.template_dataset().samples
             FileManager.save_dat(params["path_to_file"]+"dat/annotated_dataset.test.dat.atepc", dataset.to_dat())
+            DBManager=DatabaseManager()
+            DBManager.change_operation_info(project_id, "Dataset generation", 2, 0.95)

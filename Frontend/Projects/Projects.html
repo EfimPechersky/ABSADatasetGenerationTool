@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои проекты</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .create-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        /* Счетчик проектов */
+        .stats {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 25px;
+            margin-bottom: 25px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats span {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        /* Сетка проектов */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        /* Карточка проекта */
+        .project-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .project-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            word-break: break-word;
+        }
+
+        .project-date {
+            font-size: 14px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .project-date i {
+            font-style: normal;
+        }
+
+        /* Пустое состояние */
+        .empty-state {
+            background: white;
+            border-radius: 16px;
+            padding: 60px 20px;
+            text-align: center;
+            color: #888;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .empty-state .create-first-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        .empty-state .create-first-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Загрузчик */
+        .loader {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Сообщение об ошибке */
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .header-left {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .create-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>📁 Мои проекты</h1>
+                <button class="create-btn" onclick="navigateToCreateProject()">
+                    <span>➕</span> Создать проект
+                </button>
+            </div>
+            <div class="user-info">
+                <span id="userLogin" style="color: #666;"></span>
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            </div>
+        </div>
+
+        <div id="content">
+            <!-- Содержимое будет загружено сюда -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        
+        // Проверка авторизации при загрузке страницы
+        document.addEventListener('DOMContentLoaded', async () => {
+            const account_data = JSON.parse(localStorage.getItem('account_info'));
+            if (!account_data) {
+                window.location.href = '../Account/login.html';
+                return;
+            }
+            
+            const accessToken = account_data ? account_data["access_token"] : null;
+            const userLogin = account_data ? account_data["login"] : null;
+            
+            // Если нет токена или логина, отправляем на страницу входа
+            if (!accessToken || !userLogin) {
+                window.location.href = '../Account/login.html';
+                return;
+            }
+            
+            // Отображаем логин пользователя в шапке
+            document.getElementById('userLogin').textContent = userLogin;
+            
+            // Сохраняем токен для использования в других функциях
+            window.accessToken = accessToken;
+            
+            // Загружаем проекты
+            await loadProjects();
+        });
+        
+        // Навигация на страницу создания проекта
+        function navigateToCreateProject() {
+            window.location.href = 'CreateNewProject.html';
+        }
+        
+        // Навигация на страницу проекта
+        function navigateToProject(projectId) {
+            window.location.href = `Project.html?id=${projectId}`;
+        }
+        
+        // Функция загрузки проектов
+        async function loadProjects() {
+            const contentDiv = document.getElementById('content');
+            
+            // Показываем загрузчик
+            contentDiv.innerHTML = `
+                <div class="loader">
+                    <div class="spinner"></div>
+                    <p>Загрузка проектов...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`${API_BASE}/projects`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${window.accessToken}`
+                    }
+                });
+                
+                // Проверяем статус ответа
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Unauthorized');
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Проверяем статус ответа от сервера
+                if (data.status === 'Success') {
+                    displayProjects(data.result);
+                } else if (data.status === 'Error') {
+                    // Если ошибка авторизации, отправляем на логин
+                    if (data.message === 'Wrong token!') {
+                        showError('Сессия истекла. Пожалуйста, войдите снова.');
+                        setTimeout(() => {
+                            logout();
+                        }, 2000);
+                    } else {
+                        showError(data.message || 'Ошибка загрузки проектов');
+                    }
+                } else {
+                    showError('Неизвестная ошибка при загрузке проектов');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                if (error.message === 'Unauthorized') {
+                    showError('Сессия истекла. Пожалуйста, войдите снова.');
+                    setTimeout(() => {
+                        logout();
+                    }, 2000);
+                } else {
+                    showError('Ошибка соединения с сервером. Проверьте, запущен ли backend.');
+                }
+            }
+        }
+        
+        // Отображение проектов
+        function displayProjects(projects) {
+            const contentDiv = document.getElementById('content');
+            
+            if (!projects || projects.length === 0) {
+                // Пустое состояние с кнопкой создания проекта
+                contentDiv.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <h3>У вас пока нет проектов</h3>
+                        <p>Создайте свой первый проект, чтобы увидеть его здесь</p>
+                        <button class="create-first-btn" onclick="navigateToCreateProject()">
+                            ➕ Создать первый проект
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Форматируем дату
+            const formattedProjects = projects.map(project => ({
+                ...project,
+                formattedDate: formatDate(project.date)
+            }));
+            
+            // Создаем сетку с проектами
+            contentDiv.innerHTML = `
+                <div class="stats">
+                    📊 Всего проектов: <span>${projects.length}</span>
+                </div>
+                <div class="projects-grid" id="projectsGrid"></div>
+            `;
+            
+            const grid = document.getElementById('projectsGrid');
+            
+            formattedProjects.forEach(project => {
+                const card = document.createElement('div');
+                card.className = 'project-card';
+                // Переход на страницу проекта с передачей ID
+                card.onclick = () => navigateToProject(project.id);
+                card.innerHTML = `
+                    <div class="project-name">${escapeHtml(project.name)}</div>
+                    <div class="project-date">
+                        <span>📅</span> ${project.formattedDate}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+        
+        // Форматирование даты
+        function formatDate(dateString) {
+            if (!dateString) return 'Дата неизвестна';
+            
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return dateString;
+                
+                return date.toLocaleDateString('ru-RU', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return dateString;
+            }
+        }
+        
+        // Отображение ошибки
+        function showError(message) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = `
+                <div class="error-message">
+                    ❌ ${escapeHtml(message)}
+                </div>
+                <div class="empty-state">
+                    <h3>Не удалось загрузить проекты</h3>
+                    <p>Попробуйте обновить страницу или войдите снова</p>
+                </div>
+            `;
+        }
+        
+        // Выход из системы
+        function logout() {
+            localStorage.removeItem('account_info');
+            window.location.href = '../Account/login.html';
+        }
+        
+        // Защита от XSS
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>

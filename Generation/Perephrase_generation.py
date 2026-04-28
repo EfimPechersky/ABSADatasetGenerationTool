@@ -5,24 +5,34 @@ from DatasetModels.AspectModel import Aspect
 from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
-from Storage.Process_statuses import ProcessStatuses
+from Storage.DatabaseManager import DatabaseManager
 import re
 """Класс, отвечающий за генерацию примеров при помощи метода перефразирования"""
 class PerephraseGenerator:
     __all_samples=[]
     __all_dasp=[]
     perephrase_dataset:Dataset
-    __PS:ProcessStatuses
+    DBManager:DatabaseManager
     model:LLM
     """Конструктор"""
-    def __init__(self, code):
+    def __init__(self, project_id):
         self.__all_samples=[]
         self.__all_dasp=[]
         self.perephrase_dataset=Dataset()
         self.model=LLM()
-        self.__PS=ProcessStatuses()
-        self.__code=code
+        self.DBManager=DatabaseManager()
+        self.__project_id=project_id
     
+    def __change_progress(self, progress, status_id=2):
+        if status_id==None:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation",2, progress)
+        else:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation", status_id, progress)
+    
+    def __get_progress(self):
+        res=self.DBManager.get_operation_info(self.__project_id, "Dataset generation")
+        return res["progress"]
+
     """Генерация примеров"""
     def get_samples(self,domain, sentence):
         gen_prompt = Prompts.get_semantic_paraphrasing_prompt(domain,sentence)
@@ -74,8 +84,8 @@ class PerephraseGenerator:
             if len(gen_samples)==len(gen_aspects):
                 self.__all_samples+=gen_samples
                 self.__all_dasp+=gen_aspects
-            progress=self.__PS.get_dataset_generation_progress(self.__code)["progress"]+0.5/len(dataset.samples)
-            self.__PS.change_dataset_generation_progress(self.__code,"In progress", progress)
+            progress=self.__get_progress()+0.5/len(dataset.samples)
+            self.__change_progress(progress)
         for ind in range(0,len(self.__all_samples)):
             new_aspects=[]
             try:

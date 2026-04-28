@@ -207,3 +207,28 @@ class Prompts:
         {example}
         ''')
         return prompt
+    
+    def define_aspects_categories(categories, aspects):
+        return """
+        You are given a list of aspects and a set of predefined categories. Your task is to assign each aspect to the most appropriate category. If an aspect does not fit any category, assign it to "Other". Output the result strictly in the following JSON format:
+
+        {
+        'Category1': ['aspect1', 'aspect2', ..., 'aspectN'],
+        'Category2': ['aspect1', 'aspect2', ..., 'aspectM'],
+        ...
+        'CategoryN': ['aspect1', 'aspect2', ..., 'aspectM'],
+        }"""+f"""
+        Predefined categories:
+        {categories}
+
+        Aspects to categorize:
+        {aspects}
+
+        Instructions:
+
+        Do not add any extra text or explanation before or after the JSON.
+        Each aspect must appear in exactly one category.
+        If multiple aspects are absolute identical, list them only once per category.
+        Use the exact category names as provided.
+        Output only valid JSON.
+        """
