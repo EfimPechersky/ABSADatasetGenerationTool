@@ -24,7 +24,7 @@ DBManager=DatabaseManager()
 obs = observe_service()
 das = datasets_service()
 model = LLM()
-model.apiurl = "https://happy-years-repeat.loca.lt"
+model.apiurl = "https://light-ads-retire.loca.lt"
 
 app = FastAPI()
 
@@ -40,7 +40,6 @@ app.add_middleware(
 
 SAVE_DIR = "./Datasets/"
 NEW_SAVE_DIR = "./ProjectsStorage/"
-PS = ProcessStatuses()
 
 @app.options("/*")
 async def options_save_reviews():
@@ -70,9 +69,11 @@ async def create_user(request: Request):
     data = await request.json()
     try:
         DBManager.create_user(data["login"], data["password"], data["email"])
+        print("success")
         return {"status":"Success", "message":"Succesfully created new user!"}
     except Exception as e:
-        return {"status":"Error", "message":e}
+        print(e)
+        return {"status":"Error", "message":f"{e}"}
 
 @app.post("/login")
 async def login(request: Request):
@@ -81,7 +82,7 @@ async def login(request: Request):
         access_token=DBManager.login_user(data["login"], data["password"])
         return {"status":"Success", "message":access_token}
     except Exception as e:
-        return {"status":"Error", "message":e}
+        return {"status":"Error", "message":f"Wrong login or password"}
 
 @app.get("/projects")
 async def get_all_projects(request:Request):

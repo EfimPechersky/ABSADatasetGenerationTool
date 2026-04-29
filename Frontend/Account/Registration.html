@@ -62,6 +62,17 @@
             border-color: #667eea;
         }
 
+        input.error {
+            border-color: #f44336;
+        }
+
+        .error-text {
+            color: #f44336;
+            font-size: 12px;
+            margin-top: 5px;
+            display: block;
+        }
+
         button {
             width: 100%;
             padding: 12px;
@@ -128,14 +139,22 @@
             <div class="form-group">
                 <label>Логин</label>
                 <input type="text" id="login" name="login" required>
+                <span class="error-text" id="loginError"></span>
             </div>
             <div class="form-group">
                 <label>Email</label>
                 <input type="email" id="email" name="email" required>
+                <span class="error-text" id="emailError"></span>
             </div>
             <div class="form-group">
                 <label>Пароль</label>
                 <input type="password" id="password" name="password" required>
+                <span class="error-text" id="passwordError"></span>
+            </div>
+            <div class="form-group">
+                <label>Подтверждение пароля</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required>
+                <span class="error-text" id="confirmError"></span>
             </div>
             <button type="submit" id="submitBtn">Зарегистрироваться</button>
         </form>
@@ -148,23 +167,96 @@
     <script>
         const API_BASE = 'http://127.0.0.1:8000';
 
+        // Очистка ошибок при вводе
+        document.getElementById('login').addEventListener('input', () => {
+            document.getElementById('login').classList.remove('error');
+            document.getElementById('loginError').textContent = '';
+        });
+        
+        document.getElementById('email').addEventListener('input', () => {
+            document.getElementById('email').classList.remove('error');
+            document.getElementById('emailError').textContent = '';
+        });
+        
+        document.getElementById('password').addEventListener('input', () => {
+            document.getElementById('password').classList.remove('error');
+            document.getElementById('passwordError').textContent = '';
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+        });
+        
+        document.getElementById('confirmPassword').addEventListener('input', () => {
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+        });
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const login = document.getElementById('login').value;
-            const email = document.getElementById('email').value;
+            const login = document.getElementById('login').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
             const submitBtn = document.getElementById('submitBtn');
             const messageDiv = document.getElementById('message');
             
-            // Простая валидация
-            if (!login || !email || !password) {
-                showMessage('Заполните все поля', 'error');
-                return;
+            // Очищаем предыдущие ошибки
+            let isValid = true;
+            
+            document.getElementById('login').classList.remove('error');
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('email').classList.remove('error');
+            document.getElementById('emailError').textContent = '';
+            document.getElementById('password').classList.remove('error');
+            document.getElementById('passwordError').textContent = '';
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+            
+            // Валидация логина
+            if (!login) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Введите логин';
+                isValid = false;
+            } else if (login.length < 3) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Логин должен быть не менее 3 символов';
+                isValid = false;
             }
             
-            if (password.length < 4) {
-                showMessage('Пароль должен быть не менее 4 символов', 'error');
+            // Валидация email
+            if (!email) {
+                document.getElementById('email').classList.add('error');
+                document.getElementById('emailError').textContent = 'Введите email';
+                isValid = false;
+            } else if (!/^[^\s@]+@([^\s@]+\.)+[^\s@]+$/.test(email)) {
+                document.getElementById('email').classList.add('error');
+                document.getElementById('emailError').textContent = 'Введите корректный email';
+                isValid = false;
+            }
+            
+            // Валидация пароля
+            if (!password) {
+                document.getElementById('password').classList.add('error');
+                document.getElementById('passwordError').textContent = 'Введите пароль';
+                isValid = false;
+            } else if (password.length < 4) {
+                document.getElementById('password').classList.add('error');
+                document.getElementById('passwordError').textContent = 'Пароль должен быть не менее 4 символов';
+                isValid = false;
+            }
+            
+            // Валидация подтверждения пароля
+            if (!confirmPassword) {
+                document.getElementById('confirmPassword').classList.add('error');
+                document.getElementById('confirmError').textContent = 'Подтвердите пароль';
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                document.getElementById('confirmPassword').classList.add('error');
+                document.getElementById('confirmError').textContent = 'Пароли не совпадают';
+                isValid = false;
+            }
+            
+            if (!isValid) {
                 return;
             }
             
@@ -188,10 +280,15 @@
                         window.location.href = 'login.html';
                     }, 2000);
                 } else {
+                    console.log(data.message)
                     showMessage(data.message || 'Ошибка регистрации', 'error');
                 }
             } catch (error) {
-                showMessage('Ошибка соединения с сервером', 'error');
+                if (error.message.includes('Failed to fetch')) {
+                    showMessage('❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.', 'error');
+                } else {
+                    showMessage('Ошибка соединения с сервером', 'error');
+                }
                 console.error('Error:', error);
             } finally {
                 submitBtn.disabled = false;
