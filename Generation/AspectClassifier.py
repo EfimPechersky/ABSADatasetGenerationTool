@@ -49,6 +49,8 @@ class AspectClassifier:
             self.classificate_aspects()
         for cat in self.keywords:
             if aspect in self.keywords[cat]:
+                if cat not in self.count_aspects.keys():
+                    return "Другое"
                 return cat
         return "Другое"
 

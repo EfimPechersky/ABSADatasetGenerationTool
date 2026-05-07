@@ -72,6 +72,11 @@
             gap: 20px;
         }
 
+        .user-login {
+            color: #666;
+            font-weight: 500;
+        }
+
         .logout-btn {
             background: #f44336;
             color: white;
@@ -133,16 +138,20 @@
             word-break: break-word;
         }
 
+        .project-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
         .project-date {
             font-size: 14px;
             color: #888;
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .project-date i {
-            font-style: normal;
         }
 
         /* Пустое состояние */
@@ -250,7 +259,7 @@
                 </button>
             </div>
             <div class="user-info">
-                <span id="userLogin" style="color: #666;"></span>
+                <span class="user-login" id="userLogin"></span>
                 <button class="logout-btn" onclick="logout()">Выйти</button>
             </div>
         </div>
@@ -260,31 +269,27 @@
         </div>
     </div>
 
+    <script src="../Account/check-auth.js"></script>
     <script>
-        const API_BASE = 'http://127.0.0.1:8000';
         
         // Проверка авторизации при загрузке страницы
         document.addEventListener('DOMContentLoaded', async () => {
-            const account_data = JSON.parse(localStorage.getItem('account_info'));
-            if (!account_data) {
-                window.location.href = '../Account/login.html';
+            // Проверяем токен через функцию из check-auth.js
+            const token = checkAuth();
+            
+            if (!token) {
+                // checkAuth уже перенаправит на страницу логина
                 return;
             }
             
-            const accessToken = account_data ? account_data["access_token"] : null;
-            const userLogin = account_data ? account_data["login"] : null;
-            
-            // Если нет токена или логина, отправляем на страницу входа
-            if (!accessToken || !userLogin) {
-                window.location.href = '../Account/login.html';
-                return;
+            // Получаем информацию о пользователе
+            const userInfo = getCurrentUser();
+            if (userInfo && userInfo.login) {
+                document.getElementById('userLogin').textContent = `👤 ${userInfo.login}`;
             }
-            
-            // Отображаем логин пользователя в шапке
-            document.getElementById('userLogin').textContent = userLogin;
             
             // Сохраняем токен для использования в других функциях
-            window.accessToken = accessToken;
+            window.accessToken = token;
             
             // Загружаем проекты
             await loadProjects();
@@ -300,7 +305,7 @@
             window.location.href = `Project.html?id=${projectId}`;
         }
         
-        // Функция загрузки проектов
+        // Функция загрузки проектов с использованием authFetch
         async function loadProjects() {
             const contentDiv = document.getElementById('content');
             
@@ -313,20 +318,10 @@
             `;
             
             try {
-                const response = await fetch(`${API_BASE}/projects`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${window.accessToken}`
-                    }
+                // Используем authFetch из check-auth.js для автоматической обработки токена
+                const response = await authFetch(`${API_BASE}/projects`, {
+                    method: 'GET'
                 });
-                
-                // Проверяем статус ответа
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    throw new Error(`HTTP ${response.status}`);
-                }
                 
                 const data = await response.json();
                 
@@ -334,22 +329,15 @@
                 if (data.status === 'Success') {
                     displayProjects(data.result);
                 } else if (data.status === 'Error') {
-                    // Если ошибка авторизации, отправляем на логин
-                    if (data.message === 'Wrong token!') {
-                        showError('Сессия истекла. Пожалуйста, войдите снова.');
-                        setTimeout(() => {
-                            logout();
-                        }, 2000);
-                    } else {
-                        showError(data.message || 'Ошибка загрузки проектов');
-                    }
+                    showError(data.message || 'Ошибка загрузки проектов');
                 } else {
                     showError('Неизвестная ошибка при загрузке проектов');
                 }
                 
             } catch (error) {
                 console.error('Error:', error);
-                if (error.message === 'Unauthorized') {
+                if (error.message === 'Session expired' || error.message === 'No auth token') {
+                    // authFetch уже должен был перенаправить, но на всякий случай
                     showError('Сессия истекла. Пожалуйста, войдите снова.');
                     setTimeout(() => {
                         logout();
@@ -384,7 +372,7 @@
             // Форматируем дату
             const formattedProjects = projects.map(project => ({
                 ...project,
-                formattedDate: formatDate(project.date)
+                formattedDate: formatDate(project.created_at || project.date)
             }));
             
             // Создаем сетку с проектами
@@ -403,7 +391,8 @@
                 // Переход на страницу проекта с передачей ID
                 card.onclick = () => navigateToProject(project.id);
                 card.innerHTML = `
-                    <div class="project-name">${escapeHtml(project.name)}</div>
+                    <div class="project-name">📄 ${escapeHtml(project.name)}</div>
+                    ${project.description ? `<div class="project-description">${escapeHtml(project.description.substring(0, 100))}${project.description.length > 100 ? '...' : ''}</div>` : ''}
                     <div class="project-date">
                         <span>📅</span> ${project.formattedDate}
                     </div>
@@ -442,14 +431,11 @@
                 <div class="empty-state">
                     <h3>Не удалось загрузить проекты</h3>
                     <p>Попробуйте обновить страницу или войдите снова</p>
+                    <button class="create-first-btn" onclick="logout()">
+                        🔄 Перейти на страницу входа
+                    </button>
                 </div>
             `;
-        }
-        
-        // Выход из системы
-        function logout() {
-            localStorage.removeItem('account_info');
-            window.location.href = '../Account/login.html';
         }
         
         // Защита от XSS
@@ -462,6 +448,25 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        
+        // Периодическая проверка валидности токена (каждые 5 минут)
+        let tokenCheckInterval = setInterval(() => {
+            const token = getAuthToken();
+            if (!token) {
+                clearInterval(tokenCheckInterval);
+                showError('Сессия истекла. Пожалуйста, войдите снова.');
+                setTimeout(() => {
+                    logout();
+                }, 2000);
+            }
+        }, 300000); // 5 минут
+        
+        // Очищаем интервал при уходе со страницы
+        window.addEventListener('beforeunload', () => {
+            if (tokenCheckInterval) {
+                clearInterval(tokenCheckInterval);
+            }
+        });
     </script>
 </body>
 </html>

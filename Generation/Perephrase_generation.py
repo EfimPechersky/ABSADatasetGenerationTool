@@ -105,4 +105,5 @@ class PerephraseGenerator:
                     self.perephrase_dataset.add_sample(new_samp)
             except:
                 continue
+        print(self.perephrase_dataset)
             

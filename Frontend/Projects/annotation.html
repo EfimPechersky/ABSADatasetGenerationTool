@@ -177,6 +177,14 @@
             font-size: 12px;
             margin-left: 15px;
         }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
         @media (max-width: 600px) {
             .container-custom { max-width: 100%; }
             .form-card, .chart-container { padding: 20px; }
@@ -203,13 +211,13 @@
         <!-- Header -->
         <div class="header">
             <div class="header-left">
-                <button class="back-btn" onclick="goBackToProject()">← Назад к проекту</button>
+                <button class="back-btn" @click="goBackToProject">← Назад к проекту</button>
                 <h1>📝 Аннотация данных</h1>
                 <span class="project-id-badge">Проект ID: {{ projectId }}</span>
             </div>
             <div class="user-info">
                 <span class="user-login">{{ userLogin }}</span>
-                <button class="logout-btn" onclick="logout()">Выйти</button>
+                <button class="logout-btn" @click="logout">Выйти</button>
             </div>
         </div>
     </div>
@@ -246,13 +254,21 @@
         </div>
     </div>
     
-    <div class="container-custom">
+    <div class="container-custom" v-if="!currentReview && !isLoading">
+        <div class="alert alert-warning">
+            <i class="bi bi-info-circle"></i> 
+            Нет данных для аннотации. Пожалуйста, вернитесь к проекту и запустите генерацию датасета заново.
+        </div>
+    </div>
+    
+    <div class="container-custom" v-if="currentReview">
         <div class="form-card">
             <h5 class="card-header" style="background: #f8f9fa;">
                 <span>
                     Аннотация данных - {{ currentDomain }}
                     <span class="badge bg-info" style="margin-left: 10px;">ID: {{ currentReview ? currentReview.rvid : '' }}</span>
                     <span class="badge bg-secondary" style="margin-left: 10px;">Сохранено: {{ savedCount }}</span>
+                    <span class="badge bg-warning" style="margin-left: 10px;">Осталось: {{ remainingReviews }}</span>
                 </span>
             </h5>
             
@@ -310,8 +326,8 @@
     </div>
 </div>
 
+<script src="check-auth.js"></script>
 <script>
-const API_BASE = 'http://127.0.0.1:8000';
 
 new Vue({
     el: '#app',
@@ -329,7 +345,9 @@ new Vue({
         indexes: {},
         annotatedCounts: {},
         userLogin: '',
-        accessToken: ''
+        accessToken: '',
+        isLoading: true,
+        tokenCheckInterval: null
     },
     computed: {
         currentCategoryName() {
@@ -360,39 +378,100 @@ new Vue({
         
         totalAnnotated() {
             return Object.values(this.annotatedCounts).reduce((sum, val) => sum + val, 0);
+        },
+        
+        remainingReviews() {
+            return this.totalReviews - this.savedCount;
         }
     },
     
     mounted() {
-        // Проверка авторизации
-        const accountData = JSON.parse(localStorage.getItem('account_info'));
-        if (!accountData) {
-            window.location.href = '../Account/login.html';
+        // Проверка авторизации через check-auth.js
+        const token = checkAuth();
+        
+        if (!token) {
+            // checkAuth уже перенаправит на страницу логина
             return;
         }
         
-        this.userLogin = accountData.login;
-        this.accessToken = accountData.access_token;
+        // Получаем информацию о пользователе
+        const userInfo = getCurrentUser();
+        if (userInfo && userInfo.login) {
+            this.userLogin = userInfo.login;
+            this.accessToken = token;
+        } else {
+            // Пробуем альтернативный способ
+            const accountData = localStorage.getItem('account_info');
+            if (accountData) {
+                try {
+                    const account = JSON.parse(accountData);
+                    this.userLogin = account.login || '';
+                    this.accessToken = account.access_token || '';
+                } catch (e) {
+                    console.error('Error parsing account info:', e);
+                    logout();
+                }
+            } else {
+                logout();
+            }
+        }
         
         // Получаем данные из sessionStorage
         const savedData = sessionStorage.getItem('annotationData');
         if (!savedData) {
             alert('Данные не найдены. Пожалуйста, начните с проекта.');
-            window.location.href = 'projects.html';
+            window.location.href = 'Projects.html';
             return;
         }
         
-        const data = JSON.parse(savedData);
-        this.generatedExamples = data.generatedExamples;
-        this.currentDomain = data.domain;
-        this.categories = data.categories;
-        this.projectId = data.project_id;
+        try {
+            const data = JSON.parse(savedData);
+            this.generatedExamples = data.generatedExamples;
+            this.currentDomain = data.domain;
+            this.categories = data.categories;
+            this.projectId = data.project_id;
+            
+            this.initAnnotation();
+        } catch (e) {
+            console.error('Error parsing annotation data:', e);
+            alert('Ошибка загрузки данных аннотации');
+            window.location.href = 'Projects.html';
+        }
         
-        this.initAnnotation();
+        // Запускаем периодическую проверку токена
+        this.startTokenCheck();
+    },
+    
+    beforeDestroy() {
+        this.stopTokenCheck();
     },
     
     methods: {
+        startTokenCheck() {
+            this.tokenCheckInterval = setInterval(() => {
+                const token = getAuthToken();
+                if (!token) {
+                    this.stopTokenCheck();
+                    alert('Сессия истекла. Пожалуйста, войдите снова.');
+                    this.logout();
+                }
+            }, 300000); // 5 минут
+        },
+        
+        stopTokenCheck() {
+            if (this.tokenCheckInterval) {
+                clearInterval(this.tokenCheckInterval);
+                this.tokenCheckInterval = null;
+            }
+        },
+        
         initAnnotation() {
+            // Проверяем, что данные существуют
+            if (!this.generatedExamples || Object.keys(this.generatedExamples).length === 0) {
+                this.isLoading = false;
+                return;
+            }
+            
             Object.keys(this.generatedExamples).forEach(key => {
                 let examples = this.generatedExamples[key].map((text, idx) => {
                     let words = text.split(' ').filter(w => w && w.trim().length > 0);
@@ -419,12 +498,16 @@ new Vue({
                 this.annotatedCounts[categoryName] = 0;
             }
             
-            this.currentCategoryIndex = 0;
-            this.indexes[this.categories[0]] += 1;
-            this.currentReview = this.allReviews[this.categories[0]][0];
+            // Проверяем, есть ли вообще отзывы для аннотации
+            if (this.categories.length > 0 && this.allReviews[this.categories[0]] && this.allReviews[this.categories[0]].length > 0) {
+                this.currentCategoryIndex = 0;
+                this.indexes[this.categories[0]] += 1;
+                this.currentReview = this.allReviews[this.categories[0]][0];
+            }
+            
+            this.isLoading = false;
         },
         
-        // Обновление гистограммы
         updateChart() {
             // Пересчитываем счетчики аннотированных примеров
             const newCounts = {};
@@ -439,25 +522,21 @@ new Vue({
             });
             
             this.annotatedCounts = newCounts;
-            
-            // Принудительно обновляем компонент для перерисовки графиков
             this.$forceUpdate();
         },
         
         resetReview() {
+            if (this.categories.length === 0) return;
+            
             this.indexes[this.categories[this.currentCategoryIndex]] += 1;
             let index = this.indexes[this.categories[this.currentCategoryIndex]];
             
-            if (index >= this.allReviews[this.categories[this.currentCategoryIndex]].length) {
-                // Переходим к следующей категории
+            while (index >= this.allReviews[this.categories[this.currentCategoryIndex]].length) {
                 this.currentCategoryIndex += 1;
                 if (this.currentCategoryIndex >= this.categories.length) {
-                    // Все категории завершены
-                    if (this.savedCount > 0) {
-                        alert("Все примеры аннотированы! Нажмите 'Экспорт' для завершения.");
-                    } else {
-                        alert("Все примеры просмотрены, но ничего не сохранено.");
-                    }
+                    // Все категории закончились
+                    alert('Поздравляем! Вы аннотировали все примеры!');
+                    this.currentReview = null;
                     return;
                 }
                 this.indexes[this.categories[this.currentCategoryIndex]] += 1;
@@ -481,32 +560,31 @@ new Vue({
                 return;
             }
             
-            // Сохраняем категорию в отзыв
             this.currentReview.category = this.categories[this.currentCategoryIndex];
-            
             this.savedReviews.push(JSON.parse(JSON.stringify(this.currentReview)));
             this.savedCount = this.savedReviews.length;
-            
-            // Обновляем счетчики аннотаций
             this.annotatedCounts[this.currentReview.category] = (this.annotatedCounts[this.currentReview.category] || 0) + 1;
-            
-            // Обновляем гистограмму
             this.updateChart();
             
-            // Переходим к следующему отзыву
             this.indexes[this.categories[this.currentCategoryIndex]] += 1;
             this.currentCategoryIndex += 1;
             if (this.currentCategoryIndex >= this.categories.length) {
                 this.currentCategoryIndex = 0;
             }
             this.resetReview();
-            
-            alert(`Отзыв сохранен! Всего сохранено: ${this.savedCount}`);
         },
         
         async exportAll() {
             if (this.savedReviews.length === 0) {
                 alert("Нет сохраненных отзывов для экспорта");
+                return;
+            }
+            
+            // Проверяем валидность токена перед отправкой
+            const token = getAuthToken();
+            if (!token) {
+                alert('Сессия истекла. Пожалуйста, войдите снова.');
+                this.logout();
                 return;
             }
             
@@ -521,7 +599,6 @@ new Vue({
             }
             
             try {
-                // Форматируем данные для отправки на сервер
                 let jsonformat = [];
                 reviews.forEach(review => {
                     let new_review = [];
@@ -551,25 +628,19 @@ new Vue({
                     project_id: this.projectId
                 };
                 
-                const response = await fetch(`${API_BASE}/save-reviews`, {
+                // Используем authFetch для автоматической подстановки токена
+                const response = await authFetch(`${API_BASE}/save-reviews`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.accessToken}`
-                    },
                     body: JSON.stringify(requestData)
                 });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
                 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
                     alert(`Успешно отправлено ${reviews.length} отзывов на сервер`);
-                    window.location.href = `project.html?id=${this.projectId}`;
+                    // Очищаем sessionStorage
+                    sessionStorage.removeItem('annotationData');
+                    window.location.href = `Project.html?id=${this.projectId}`;
                 } else {
                     alert(result.message || 'Ошибка при отправке');
                     if (btn) {
@@ -581,7 +652,10 @@ new Vue({
             } catch (err) {
                 console.error('Ошибка при отправке на сервер:', err);
                 
-                if (err.message.includes('Failed to fetch')) {
+                if (err.message === 'Session expired' || err.message === 'No auth token') {
+                    alert('Сессия истекла. Пожалуйста, войдите снова.');
+                    this.logout();
+                } else if (err.message.includes('Failed to fetch')) {
                     alert(`❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.`);
                 } else {
                     alert(`❌ Ошибка при отправке данных: ${err.message}`);
@@ -626,10 +700,10 @@ new Vue({
                 sanitize: false,
                 title: '<div class="float-end popClose"><i class="bi bi-x-square"></i></div>',
                 content: '<div id="pop_' + tkspanid + '" class="btn-group" role="group">' +
-                    '<button id="Pos" type="button" class="btn btn-success btn-sm">Positive</button>' +
-                    '<button id="Neu" type="button" class="btn btn-secondary btn-sm">Neutral</button>' +
-                    '<button id="Neg" type="button" class="btn btn-danger btn-sm">Negative</button>' +
-                    '<button id="Del" type="button" class="btn btn-primary btn-sm">Clear</button>' +
+                    '<button id="Pos" type="button" class="btn btn-success btn-sm">Позитивный</button>' +
+                    '<button id="Neu" type="button" class="btn btn-secondary btn-sm">Нейтральный</button>' +
+                    '<button id="Neg" type="button" class="btn btn-danger btn-sm">Негативный</button>' +
+                    '<button id="Del" type="button" class="btn btn-primary btn-sm">Очистить</button>' +
                     '</div>'
             });
             
@@ -659,24 +733,25 @@ new Vue({
                     this.$forceUpdate();
                 }.bind(this));
             }.bind(this));
+        },
+        
+        goBackToProject() {
+            this.stopTokenCheck();
+            if (this.projectId) {
+                window.location.href = `Project.html?id=${this.projectId}`;
+            } else {
+                window.location.href = 'Projects.html';
+            }
+        },
+        
+        logout() {
+            this.stopTokenCheck();
+            localStorage.removeItem('account_info');
+            sessionStorage.removeItem('annotationData');
+            window.location.href = '../Account/Login.html';
         }
     }
 });
-
-// Вспомогательные функции
-function goBackToProject() {
-    const projectId = JSON.parse(sessionStorage.getItem('annotationData'))?.project_id;
-    if (projectId) {
-        window.location.href = `project.html?id=${projectId}`;
-    } else {
-        window.location.href = 'projects.html';
-    }
-}
-
-function logout() {
-    localStorage.removeItem('account_info');
-    window.location.href = '../Account/login.html';
-}
 </script>
 </body>
 </html>

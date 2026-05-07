@@ -13,6 +13,7 @@ class Project(Base):
     user:Mapped["User"] = relationship(back_populates="projects")
     operations = relationship("Operation", back_populates="project")
     model = relationship("ModelTraining", back_populates="project")
+    queue = relationship("Queue", back_populates="project")
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True),server_default=func.now())
     dir_name: Mapped[str] = mapped_column(String(255))
     def __repr__(self) -> str:

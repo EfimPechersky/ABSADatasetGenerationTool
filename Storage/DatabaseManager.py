@@ -8,17 +8,37 @@ from Storage.OperationTypesTable import OperationType
 from Storage.ProjectsTable import Project
 from Storage.UserTable import User
 from Storage.ModelTrainTable import ModelTraining
+from Storage.TrainingQueue import Queue
 from custom_exceptions import argument_exception, operation_exception
 import bcrypt
 from uuid import uuid4
 from sqlalchemy import func
+import jwt
+from datetime import datetime, timedelta
+
+SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2024"  # В продакшене храните в .env
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """Создание JWT токена"""
+    to_encode = data.copy()
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
 class DatabaseManager:
     _instance = None
     _initialized=False
     engine=None
     op_types=[]
     op_statuses=[]
-    tables=[Operation.__tablename__,OperationType.__tablename__, User.__tablename__,Project.__tablename__, OperationStatus.__tablename__, ModelTraining.__tablename__]
+    tables=[Operation.__tablename__,OperationType.__tablename__, User.__tablename__,Project.__tablename__, OperationStatus.__tablename__, ModelTraining.__tablename__, Queue.__tablename__]
     
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -44,7 +64,8 @@ class DatabaseManager:
                     OperationStatus(name="Not started"),
                     OperationStatus(name="In progress"), 
                     OperationStatus(name="Done"), 
-                    OperationStatus(name="Error")
+                    OperationStatus(name="Error"),
+                    OperationStatus(name="Queue")
                 ]
                 session.add_all(self.op_types)
                 session.add_all(self.op_statuses)
@@ -69,35 +90,37 @@ class DatabaseManager:
             if len(login)<=0 or len(login)>length:
                 raise argument_exception(f"Wrong length of value '{value.__name__}'")
 
-    def create_user(self, login, password, email):
+    def create_user(self, login, password_hash, email):
         with self.session() as session:
+            # Проверка существования пользователя
             stmt = select(func.count(User.id)).where(User.login == login)
             row_count = session.scalar(stmt)
-            if row_count>0:
+            if row_count > 0:
                 raise argument_exception("User with this login already exists!")
             stmt = select(func.count(User.id)).where(User.email == email)
             row_count = session.scalar(stmt)
-            if row_count>0:
+            if row_count > 0:
                 raise argument_exception("User with this email already exists!")
             
-            utfpassword = password.encode('utf-8')
-            salt = bcrypt.gensalt()
-            hashed = bcrypt.hashpw(utfpassword, salt).decode('utf-8')
-            new_user=User(login=login, password=hashed, email=email)
+            # Пароль уже пришел в виде хеша, сохраняем его как есть
+            # (или можно дополнительно захешировать bcrypt для двойной защиты)
+            new_user = User(login=login, password=password_hash, email=email)
             session.add_all([new_user])
             session.commit()
-    
-    def login_user(self, login, password):
+
+    def login_user(self, login, password_hash):
         with self.session() as session:
             stmt = select(User).where(User.login == login)
             user = session.scalars(stmt).one()
-            utfpassword = password.encode('utf-8')
-            salt = bcrypt.gensalt()
-            hashed = bcrypt.hashpw(utfpassword, salt)
-            if bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-                user.access_token=str(uuid4())
+            
+            # Сравниваем хеш из БД с пришедшим хешем
+            if user.password == password_hash:
+                access_token = create_access_token(
+                    data={"sub": str(user.id), "login": user.login, "email": user.email}
+                )
+                user.access_token = access_token
                 session.commit()
-                return user.access_token
+                return access_token
             else:
                 raise argument_exception("Wrong login or password!")
 
@@ -226,6 +249,34 @@ class DatabaseManager:
             session.commit()
         return True
     
+    def add_to_queue(self, project_id, batch_size, num_epochs):
+         with self.session() as session:
+            project=session.get(Project, project_id)
+            new_queue_row = Queue(project=project, batch_size=batch_size, num_epochs=num_epochs)
+            session.add(new_queue_row)
+            session.commit()
+
+    def complete_queue(self, project_id):
+        with self.session() as session:
+            stmt = select(Queue).where(Queue.project_id == project_id)
+            queue_row = session.scalars(stmt).one()
+            queue_row.is_completed=True
+            session.commit()
+
+    def get_count_queue(self):
+        with self.session() as session:
+            stmt = select(func.count(Queue.id)).where(Queue.is_completed == False)
+            row_count = session.scalar(stmt)
+            return row_count
+
+    def next_in_queue(self):
+        if self.get_count_queue()==0:
+            return False
+        with self.session() as session:
+            stmt = select(Queue).where(Queue.is_completed == False).order_by(Queue.id)
+            queue_row = session.scalars(stmt).first()
+            return {"project_id":queue_row.project_id, "batch_size":queue_row.batch_size, "num_epochs":queue_row.num_epochs}
+
     def get_model_training_progress(self, project_id):
         with self.session() as session:
             stmt = select(ModelTraining).where(ModelTraining.project_id==project_id)

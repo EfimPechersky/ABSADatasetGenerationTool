@@ -1,97 +1,120 @@
-from DatasetModels.AspectModel import Aspect
-from custom_exceptions import argument_exception, operation_exception
+# SampleModel.py - исправленный метод to_dat
 import spacy
-"""Класс, описывающий пример с разметкой"""
+from custom_exceptions import argument_exception, operation_exception
+from DatasetModels.AspectModel import Aspect
+
 class Sample:
-    __review:str=""
-    __aspects:list=[]
-    """Конструктор"""
-    def __init__(self, review:str="", aspects:list=None):
-        self.review=review
-        if aspects!=None:
-            self.aspects=aspects
-        else:
-            self.aspects=[]
+    __review: str = ""
+    __aspects: list = []
     
-    """Текст примера"""
+    def __init__(self, review: str = "", aspects: list = None):
+        self.review = review
+        if aspects != None:
+            self.aspects = aspects
+        else:
+            self.aspects = []
+    
     @property
     def review(self):
         return self.__review
     
     @review.setter
-    def review(self,value):
-        if not isinstance(value,str):
+    def review(self, value):
+        if not isinstance(value, str):
             raise argument_exception("Wrong type of text review!")
-        self.__review=value
+        self.__review = value
     
-    """Список аспектов"""
     @property
     def aspects(self):
         return self.__aspects
     
     @aspects.setter
-    def aspects(self,value):
-        self.__aspects=[]
-        if isinstance(value,list):
+    def aspects(self, value):
+        self.__aspects = []
+        if isinstance(value, list):
             for asp in value:
                 self.add_aspect(asp)
         else:
             raise argument_exception("Wrong type of aspects")
     
-    """Добавить аспект в пример"""
-    def add_aspect(self,value):
-        if not isinstance(value,Aspect):
+    def add_aspect(self, value):
+        if not isinstance(value, Aspect):
             raise argument_exception("Aspect has wrong type or already added")
-        if value.term in self.review and value not in self.aspects:        
-            self.__aspects+=[value]
-
-    """Преобразовать пример в json"""
+        if value.term in self.review and value not in self.aspects:
+            self.__aspects += [value]
+    
     def to_json(self):
-        result=[self.review,{}]
+        result = [self.review, {}]
         for asp in self.__aspects:
-            result[1][asp.term]=asp.sentiment
+            result[1][asp.term] = asp.sentiment
         return result
-
-    """Преобразовать json в пример"""
+    
     def from_json(json):
-        if isinstance(json,list) and len(json)==2:
-            if isinstance(json[0],str) and isinstance(json[1], dict):
-                aspects=[]
+        if isinstance(json, list) and len(json) == 2:
+            if isinstance(json[0], str) and isinstance(json[1], dict):
+                aspects = []
                 for asp in json[1]:
                     try:
-                        new_asp=Aspect(asp,json[1][asp])
-                        aspects+=[new_asp]
+                        new_asp = Aspect(asp, json[1][asp])
+                        aspects += [new_asp]
                     except:
                         return False
                 return Sample(json[0], aspects)
             return False
         return False
     
-    """Преобразовать пример в формат для обучения модели"""
     def to_dat(self):
+        """Преобразовать пример в формат для обучения модели"""
         nlp = spacy.load("ru_core_news_sm")
         doc = nlp(self.review)
-        text_tokens = list(filter(lambda x: (not x in ["<", ">"]),[token.text for token in doc]))
-        new_aspects=[]
+        text_tokens = list(filter(lambda x: (not x in ["<", ">"]), [token.text for token in doc]))
+        
+        # Подготавливаем все аспекты с их токенами и позициями
+        all_aspects = []
         for asp in self.aspects:
-           doc = nlp(asp.term)
-           aspect_tokens = [token.text for token in doc]
-           aspect_tokens=list(filter(lambda x: (not x in ["<", ">"]),aspect_tokens))
-           new_aspects+=[[aspect_tokens,asp.sentiment]]
-        dats=[]
-        for main_asp in new_aspects:
-            dat=[]
-            for tok in text_tokens:
-                if tok.strip()=="":
-                    continue
-                tok_type="O"
-                sentiment="-100"
-                for asp in new_aspects:
-                    if tok.lower() in list(map(str.lower,asp[0])):
-                        tok_type="B-ASP"
-                        if tok.lower() in list(map(str.lower,main_asp[0])):
-                            sentiment=asp[1]
-                            break
-                dat+=[[tok.strip(),tok_type,sentiment.strip()]]
-            dats+=[dat]
+            doc = nlp(asp.term)
+            aspect_tokens = [token.text for token in doc]
+            aspect_tokens = list(filter(lambda x: (not x in ["<", ">"]), aspect_tokens))
+            
+            # Находим позиции аспекта в тексте
+            for i in range(len(text_tokens) - len(aspect_tokens) + 1):
+                if [t.lower() for t in text_tokens[i:i+len(aspect_tokens)]] == [t.lower() for t in aspect_tokens]:
+                    all_aspects.append({
+                        'tokens': aspect_tokens,
+                        'start': i,
+                        'end': i + len(aspect_tokens),
+                        'sentiment': asp.sentiment,
+                        'term': asp.term
+                    })
+                    break
+        
+        # Создаем дублированные примеры для каждого аспекта
+        dats = []
+        for main_asp in all_aspects:
+            dat = []
+            marks = ['O'] * len(text_tokens)
+            sentiments = ['-100'] * len(text_tokens)
+            
+            # Размечаем ВСЕ аспекты в этом примере
+            for asp in all_aspects:
+                # Определяем тональность для этого аспекта
+                if asp == main_asp:
+                    sentiment = asp['sentiment']
+                else:
+                    sentiment = '-100'
+                
+                # Размечаем токены аспекта
+                marks[asp['start']] = 'B-ASP'
+                sentiments[asp['start']] = sentiment
+                for j in range(1, len(asp['tokens'])):
+                    marks[asp['start'] + j] = 'I-ASP'
+                    sentiments[asp['start'] + j] = sentiment
+            
+            # Собираем результат для этого примера
+            for i, token in enumerate(text_tokens):
+                if token.strip():
+                    dat.append([token.strip(), marks[i], sentiments[i].strip()])
+            
+            dats.append(dat)
+        
         return dats

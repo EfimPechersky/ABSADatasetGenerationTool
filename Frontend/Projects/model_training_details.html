@@ -200,6 +200,13 @@
             border-radius: 8px;
             text-align: center;
         }
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
         .refresh-btn {
             background: #28a745;
             color: white;
@@ -211,6 +218,11 @@
         }
         .refresh-btn:hover {
             background: #218838;
+        }
+        .auto-refresh-badge {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
         }
         @media (max-width: 768px) {
             .header {
@@ -234,12 +246,12 @@
     <div class="container-custom">
         <div class="header">
             <div class="header-left">
-                <button class="back-btn" onclick="goBack()">← Назад к проекту</button>
+                <button class="back-btn" @click="goBack">← Назад к проекту</button>
                 <h1>📊 Детали обучения модели</h1>
             </div>
             <div class="user-info">
                 <span class="user-login">{{ userLogin }}</span>
-                <button class="logout-btn" onclick="logout()">Выйти</button>
+                <button class="logout-btn" @click="logout">Выйти</button>
             </div>
         </div>
         
@@ -256,11 +268,20 @@
                     ❌ {{ errorMsg }}
                 </div>
                 
+                <div v-else-if="trainingNotStarted" class="info-message">
+                    <i class="bi bi-info-circle"></i> Обучение модели еще не начато.
+                    <br>Вернитесь к проекту и запустите обучение модели.
+                </div>
+                
                 <div v-else>
                     <div style="margin-bottom: 20px; text-align: right;">
-                        <button class="refresh-btn" @click="loadData">
-                            <i class="bi bi-arrow-repeat"></i> Обновить
+                        <button class="refresh-btn" @click="loadData" :disabled="isRefreshing">
+                            <i class="bi bi-arrow-repeat" :class="{'spin': isRefreshing}"></i> 
+                            {{ isRefreshing ? 'Обновление...' : 'Обновить' }}
                         </button>
+                        <span class="auto-refresh-badge" v-if="pollingInterval">
+                            <i class="bi bi-clock-history"></i> Автообновление каждые 10 сек
+                        </span>
                     </div>
                     
                     <!-- Диаграмма с тремя графиками -->
@@ -273,15 +294,15 @@
                         <div class="legend">
                             <div class="legend-item">
                                 <div class="legend-color" style="background: #FF6384;"></div>
-                                <span>Точность определения тональности</span>
+                                <span>Точность определения тональности (APC-ACC)</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-color" style="background: #36A2EB;"></div>
-                                <span>F1 определение тональности</span>
+                                <span>F1 определение тональности (APC-F1)</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-color" style="background: #FFCE56;"></div>
-                                <span>F1 извлечения аспектов</span>
+                                <span>F1 извлечения аспектов (ATE-F1)</span>
                             </div>
                         </div>
                     </div>
@@ -302,14 +323,10 @@
                         </div>
                     </div>
                     
-                    <div v-if="!latestMetrics && !isLoading" class="error-message">
-                        Нет данных об обучении. Возможно, обучение еще не начато.
-                    </div>
-                    
                     <!-- Таблица с деталями по эпохам -->
                     <div class="epochs-table" v-if="metricsData.length > 0">
                         <h5 style="margin-bottom: 15px;"><i class="bi bi-table"></i> Детали по эпохам</h5>
-                        <table>
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Эпоха</th>
@@ -320,7 +337,7 @@
                             </thead>
                             <tbody>
                                 <tr v-for="metric in metricsData" :key="metric.epoch">
-                                    <td>{{ metric.epoch }}</td>
+                                    <td><strong>{{ metric.epoch || metric.epoch_num || '—' }}</strong></td>
                                     <td>{{ metric.apc_acc?.toFixed(4) || '—' }}</td>
                                     <td>{{ metric.apc_f1?.toFixed(4) || '—' }}</td>
                                     <td>{{ metric.ate_f1?.toFixed(4) || '—' }}</td>
@@ -334,8 +351,8 @@
     </div>
 </div>
 
+<script src="check-auth.js"></script>
 <script>
-const API_BASE = 'http://127.0.0.1:8000';
 
 new Vue({
     el: '#app',
@@ -344,9 +361,11 @@ new Vue({
         accessToken: null,
         userLogin: '',
         isLoading: true,
+        isRefreshing: false,
         errorMsg: '',
         metricsData: [],
         chartInstance: null,
+        pollingInterval: null,
         chartData: {
             labels: [],
             datasets: [
@@ -378,25 +397,45 @@ new Vue({
                     fill: true
                 }
             ]
-        },
-        pollingInterval: null
+        }
     },
     computed: {
         latestMetrics() {
             if (this.metricsData.length === 0) return null;
             return this.metricsData[this.metricsData.length - 1];
+        },
+        trainingNotStarted() {
+            return !this.isLoading && !this.errorMsg && this.metricsData.length === 0;
         }
     },
     mounted() {
-        // Проверка авторизации
-        const accountData = JSON.parse(localStorage.getItem('account_info'));
-        if (!accountData) {
-            window.location.href = '../Account/login.html';
+        // Проверка авторизации через check-auth.js
+        const token = checkAuth();
+        
+        if (!token) {
             return;
         }
         
-        this.userLogin = accountData.login;
-        this.accessToken = accountData.access_token;
+        // Получаем информацию о пользователе
+        const userInfo = getCurrentUser();
+        if (userInfo && userInfo.login) {
+            this.userLogin = userInfo.login;
+            this.accessToken = token;
+        } else {
+            const accountData = localStorage.getItem('account_info');
+            if (accountData) {
+                try {
+                    const account = JSON.parse(accountData);
+                    this.userLogin = account.login || '';
+                    this.accessToken = account.access_token || '';
+                } catch (e) {
+                    console.error('Error parsing account info:', e);
+                    this.logout();
+                }
+            } else {
+                this.logout();
+            }
+        }
         
         // Получаем данные из sessionStorage
         const savedData = sessionStorage.getItem('modelTrainingDetails');
@@ -406,46 +445,59 @@ new Vue({
             return;
         }
         
-        const data = JSON.parse(savedData);
-        this.projectId = data.project_id;
-        this.accessToken = data.access_token || this.accessToken;
+        try {
+            const data = JSON.parse(savedData);
+            this.projectId = data.project_id;
+            this.accessToken = data.access_token || this.accessToken;
+        } catch (e) {
+            console.error('Error parsing session data:', e);
+            this.errorMsg = 'Ошибка загрузки данных';
+            this.isLoading = false;
+        }
         
-        this.loadData();
-        this.startPolling();
+        if (this.projectId) {
+            this.loadData();
+            this.startPolling();
+        }
     },
     beforeDestroy() {
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-        }
+        this.stopPolling();
         if (this.chartInstance) {
             this.chartInstance.destroy();
+            this.chartInstance = null;
         }
     },
     methods: {
         async loadData() {
+            if (!this.projectId) return;
+            
+            this.isRefreshing = true;
+            
             try {
-                const response = await fetch(`${API_BASE}/get_train_model_status?project_id=${this.projectId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    throw new Error(`HTTP ${response.status}`);
+                // Проверяем валидность токена
+                const token = getAuthToken();
+                if (!token) {
+                    this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                    this.isLoading = false;
+                    this.isRefreshing = false;
+                    setTimeout(() => this.logout(), 2000);
+                    return;
                 }
                 
+                const response = await authFetch(`${API_BASE}/get_train_model_status?project_id=${this.projectId}`, {
+                    method: 'GET'
+                });
+                
                 const result = await response.json();
-                console.log(result);
-                if (result.status === 'Success') {
+                
+                if (result.status === 'Success' || result.status === 'success') {
                     this.metricsData = result.data || [];
+                    this.errorMsg = '';
                     this.updateChart();
                     this.isLoading = false;
                 } else if (result.status === 'Error') {
                     this.errorMsg = result.message || 'Ошибка загрузки данных';
+                    this.metricsData = [];
                     this.isLoading = false;
                 } else {
                     this.metricsData = [];
@@ -453,16 +505,19 @@ new Vue({
                 }
                 
             } catch (error) {
-                console.error('Error:', error);
-                if (error.message === 'Unauthorized') {
+                console.error('Error loading training data:', error);
+                
+                if (error.message === 'Session expired' || error.message === 'No auth token') {
                     this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
+                    setTimeout(() => this.logout(), 2000);
+                } else if (error.message.includes('Failed to fetch')) {
+                    this.errorMsg = 'Не удалось подключиться к серверу. Проверьте, запущен ли backend.';
                 } else {
-                    this.errorMsg = 'Ошибка соединения с сервером.';
+                    this.errorMsg = `Ошибка: ${error.message}`;
                 }
                 this.isLoading = false;
+            } finally {
+                this.isRefreshing = false;
             }
         },
         
@@ -470,9 +525,29 @@ new Vue({
             if (this.pollingInterval) {
                 clearInterval(this.pollingInterval);
             }
+            // Проверяем, идет ли еще обучение (если последняя эпоха не завершена или обучение активно)
             this.pollingInterval = setInterval(() => {
-                this.loadData();
+                // Проверяем, нужно ли продолжать обновление
+                const isTrainingActive = this.checkTrainingActive();
+                if (isTrainingActive) {
+                    this.loadData();
+                }
             }, 10000); // Обновляем каждые 10 секунд
+        },
+        
+        stopPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+        },
+        
+        checkTrainingActive() {
+            // Если нет данных или последняя запись не показывает завершение обучения
+            if (this.metricsData.length === 0) return true;
+            // Можно добавить логику проверки, завершено ли обучение
+            // Например, если есть поле is_complete в данных
+            return true;
         },
         
         updateChart() {
@@ -484,14 +559,17 @@ new Vue({
             
             // Заполняем данные из метрик
             this.metricsData.forEach((metric, index) => {
-                this.chartData.labels.push(`Эпоха ${metric.epoch || index + 1}`);
-                this.chartData.datasets[0].data.push(metric.apc_acc || 0);
-                this.chartData.datasets[1].data.push(metric.apc_f1 || 0);
-                this.chartData.datasets[2].data.push(metric.ate_f1 || 0);
+                const epochNum = metric.epoch || metric.epoch_num || (index + 1);
+                this.chartData.labels.push(`Эпоха ${epochNum}`);
+                this.chartData.datasets[0].data.push(metric.apc_acc !== undefined ? metric.apc_acc : 0);
+                this.chartData.datasets[1].data.push(metric.apc_f1 !== undefined ? metric.apc_f1 : 0);
+                this.chartData.datasets[2].data.push(metric.ate_f1 !== undefined ? metric.ate_f1 : 0);
             });
             
             // Перерисовываем график
-            this.renderChart();
+            this.$nextTick(() => {
+                this.renderChart();
+            });
         },
         
         renderChart() {
@@ -502,6 +580,7 @@ new Vue({
             
             if (this.chartInstance) {
                 this.chartInstance.destroy();
+                this.chartInstance = null;
             }
             
             if (this.chartData.labels.length === 0) return;
@@ -514,7 +593,12 @@ new Vue({
                     maintainAspectRatio: true,
                     plugins: {
                         legend: {
-                            display: false
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 10
+                            }
                         },
                         tooltip: {
                             mode: 'index',
@@ -523,7 +607,7 @@ new Vue({
                                 label: function(context) {
                                     let label = context.dataset.label || '';
                                     let value = context.raw;
-                                    return `${label}: ${value.toFixed(4)}`;
+                                    return `${label}: ${(value * 100).toFixed(2)}%`;
                                 }
                             }
                         }
@@ -535,8 +619,13 @@ new Vue({
                             max: 100,
                             title: {
                                 display: true,
-                                text: 'Значения метрик',
+                                text: 'Значение метрики',
                                 color: '#666'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100).toFixed(0) + '%';
+                                }
                             },
                             grid: {
                                 color: 'rgba(0, 0, 0, 0.05)'
@@ -560,24 +649,25 @@ new Vue({
                     }
                 }
             });
+        },
+        
+        goBack() {
+            this.stopPolling();
+            if (this.projectId) {
+                window.location.href = `Project.html?id=${this.projectId}`;
+            } else {
+                window.location.href = 'Projects.html';
+            }
+        },
+        
+        logout() {
+            this.stopPolling();
+            localStorage.removeItem('account_info');
+            sessionStorage.removeItem('modelTrainingDetails');
+            window.location.href = '../Account/Login.html';
         }
     }
 });
-
-// Вспомогательные функции
-function goBack() {
-    const projectId = this?.projectId || JSON.parse(sessionStorage.getItem('modelTrainingDetails'))?.project_id;
-    if (projectId) {
-        window.location.href = `project.html?id=${projectId}`;
-    } else {
-        window.location.href = 'projects.html';
-    }
-}
-
-function logout() {
-    localStorage.removeItem('account_info');
-    window.location.href = '../Account/login.html';
-}
 </script>
 </body>
 </html>

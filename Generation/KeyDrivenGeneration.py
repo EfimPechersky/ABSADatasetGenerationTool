@@ -60,9 +60,18 @@ class KeyDrivenGenerator:
             asp=Prompts.prompt_AspectTerm(domain,i)
             messages =[{"role":"system", "content": Prompts.absa_description},{"role": "user", "content": asp}]
             res=self.model.send_prompt(messages)
-            lst=res[res.index("["):res.index("]")+1]
-            lst=lst.replace("\n", "")
-            lst=lst.replace("'",'"')
+            try:
+                lst=res[res.index("["):res.index("]")+1]
+                lst=lst.replace("\n", "")
+                lst=lst.replace("'",'"')
+            except:
+                asp=Prompts.prompt_AspectTerm(domain,i)
+                messages =[{"role":"system", "content": f"You made a mistake in this answer: {res}, DONT REPEAT IT"},{"role": "user", "content": asp}]
+                res=self.model.send_prompt(messages)
+                print(res)
+                lst=res[res.index("["):res.index("]")+1]
+                lst=lst.replace("\n", "")
+                lst=lst.replace("'",'"')
             self.__aspects[i]=json.loads(lst)
             progress=self.__get_progress()+0.2/len(self.__categories)
             self.__change_progress(progress)
@@ -73,13 +82,23 @@ class KeyDrivenGenerator:
             ops=Prompts.prompt_OpinionTerm(domain,i)
             messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": ops}]
             res=self.model.send_prompt(messages)
-            lst=res
-            lst=lst.replace("\n", "")
-            lst=lst.replace("\t", "")
-            #lst=lst.replace(" ","")
-            lst=lst.replace("'",'"')
-            lst=lst[lst.index("["):lst.rindex("]")+1]
-            print(lst)
+            try:
+                lst=res
+                lst=lst.replace("\n", "")
+                lst=lst.replace("\t", "")
+                #lst=lst.replace(" ","")
+                lst=lst.replace("'",'"')
+                lst=lst[lst.index("["):lst.rindex("]")+1]
+            except:
+                ops=Prompts.prompt_OpinionTerm(domain,i)
+                messages =[{"role":"system", "content": f"You made a mistake in this answer: {res}, DONT REPEAT IT"},{"role": "user", "content": ops}]
+                res=self.model.send_prompt(messages)
+                lst=res
+                lst=lst.replace("\n", "")
+                lst=lst.replace("\t", "")
+                #lst=lst.replace(" ","")
+                lst=lst.replace("'",'"')
+                lst=lst[lst.index("["):lst.rindex("]")+1]
             self.__opinions[i]=json.loads(lst)
             progress=self.__get_progress()+0.2/len(self.__categories)
             self.__change_progress(progress)

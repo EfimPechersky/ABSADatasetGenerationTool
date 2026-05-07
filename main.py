@@ -1,30 +1,32 @@
+
+import jwt
+from datetime import datetime, timedelta
+from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
 import re
-from Observer.observe_service import observe_service
-from Observer.datasets_service import datasets_service
-from Observer.event_type import event_type
 from Model.LLM import LLM
 from datetime import datetime
 from Generation.KeyDrivenGeneration import KeyDrivenGenerator
+from Generation.Full_generation import SamplesGenerator
 import random
 import asyncio
 from Model.ABSAModel import ABSAModel
 from FileManager.FileManager import FileManager
 from Generation.AspectClassifier import AspectClassifier
+from DatasetModels.DatasetModel import Dataset
 from Storage.DatabaseManager import DatabaseManager
 from unidecode import unidecode
+
 def generate_code():
     return random.randrange(1000000000, 10000000000)
 
 DBManager=DatabaseManager()
 # Инициализация сервисов
-obs = observe_service()
-das = datasets_service()
 model = LLM()
-model.apiurl = "https://light-ads-retire.loca.lt"
+model.apiurl = "https://21c7-34-124-181-90.ngrok-free.app"
 
 app = FastAPI()
 
@@ -40,6 +42,33 @@ app.add_middleware(
 
 SAVE_DIR = "./Datasets/"
 NEW_SAVE_DIR = "./ProjectsStorage/"
+
+SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2024"  # В продакшене храните в .env
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """Создание JWT токена"""
+    to_encode = data.copy()
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(token: str):
+    """Проверка JWT токена"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 @app.options("/*")
 async def options_save_reviews():
@@ -78,11 +107,11 @@ async def create_user(request: Request):
 @app.post("/login")
 async def login(request: Request):
     data = await request.json()
-    try:
-        access_token=DBManager.login_user(data["login"], data["password"])
-        return {"status":"Success", "message":access_token}
-    except Exception as e:
-        return {"status":"Error", "message":f"Wrong login or password"}
+    #try:
+    access_token=DBManager.login_user(data["login"], data["password"])
+    return {"status":"Success", "message":access_token}
+    #except Exception as e:
+    #    return {"status":"Error", "message":f"Wrong login or password"}
 
 @app.get("/projects")
 async def get_all_projects(request:Request):
@@ -244,7 +273,7 @@ async def save_reviews(request: Request, background_tasks: BackgroundTasks):
     if user.access_token == access_token and project.user_id==user.id:
         if DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Done":
             return {"status":"Error", "message":"Previous operation not completed"}
-        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started":
+        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Error":
             return {'status':"Error", "message":"Its already done"}
         
         # Запускаем фоновую задачу
@@ -277,9 +306,43 @@ async def train_model(request: Request, background_tasks: BackgroundTasks):
             return {"status":"Error", "message":"Previous operation not completed"}
         if DBManager.get_operation_info(project_id, "Model training")["status"] == "Done":
             return {'status':"Error", "message":"Its already done"}
-        background_tasks.add_task(process_train_model_task, data, project_id)
+        if DBManager.get_operation_info(project_id, "Model training")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Model training")["status"] != "Error" and DBManager.get_operation_info(project_id, "Model training")["status"] != "Queue":
+            print(DBManager.get_operation_info(project_id, "Model training"))
+            return {'status':"Error", "message":"Its in progress"}
+        DBManager.change_operation_info(project_id, "Model training", 5, 0.0)
+        DBManager.add_to_queue(project_id, data["batch_size"],data["epochs"])
+        if DBManager.get_count_queue()<2:
+            background_tasks.add_task(new_process_train_model_task)
         return {"status": "success"}
     raise HTTPException(status_code=401, detail="Wrong access token!")
+
+#@app.post("/train_model")
+#async def train_model(request: Request, background_tasks: BackgroundTasks):
+#    data = await request.json()
+#    project_id=data["project_id"]
+#    auth_header = request.headers.get("Authorization")
+#    
+#    if not auth_header:
+#        raise HTTPException(status_code=401, detail="Authorization header missing")
+#    
+#    # Проверяем формат "Bearer <token>"
+#    parts = auth_header.split()
+#    if len(parts) != 2 or parts[0].lower() != "bearer":
+#        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+#    
+#    access_token = parts[1]
+#    user = DBManager.get_user_by_access_token(access_token)
+#    if not user:
+#        return {"status":"Error", "message":"Wrong acess token!"}
+#    project = DBManager.get_project_by_id(project_id)
+#    if user.access_token == access_token and project.user_id==user.id:
+#        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Done":
+#            return {"status":"Error", "message":"Previous operation not completed"}
+#        if DBManager.get_operation_info(project_id, "Model training")["status"] == "Done":
+#            return {'status':"Error", "message":"Its already done"}
+#        background_tasks.add_task(process_train_model_task, data, project_id)
+#        return {"status": "success"}
+#    raise HTTPException(status_code=401, detail="Wrong access token!")
 
 @app.post("/analyse_reviews")
 async def analyse_reviews(request: Request, background_tasks: BackgroundTasks):
@@ -329,7 +392,7 @@ async def get_train_model_status(request: Request, project_id: int):
         return {"status":"Error", "message":"Wrong acess token!"}
     project = DBManager.get_project_by_id(project_id)
     if user.access_token == access_token and project.user_id==user.id:
-        if DBManager.get_operation_info(project_id, "Model training")["status"] == "Not started":
+        if DBManager.get_operation_info(project_id, "Model training")["status"] == "Not started" or DBManager.get_operation_info(project_id, "Model training")["status"] == "Queue":
             return {'status':"Error", "message":"Process not started"}
         ABSAModel.update_info_from_logs(project_id)
         res=DBManager.get_model_training_progress(project_id)
@@ -340,9 +403,7 @@ async def get_train_model_status(request: Request, project_id: int):
 async def process_save_reviews_task(data: dict, project_id: int):
     """Фоновая задача для сохранения отзывов"""
     try:
-        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started":
-            print("ha")
-            print(DBManager.get_operation_info(project_id, "Dataset generation"))
+        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Error":
             return
         DBManager.change_operation_info(project_id, "Dataset generation", 2, 0.0)
         dir_name=DBManager.get_project_by_id(project_id).dir_name
@@ -354,12 +415,16 @@ async def process_save_reviews_task(data: dict, project_id: int):
         
         with open(f"{new_dir}{filename}", 'w', encoding="utf-8") as f:
             json.dump(data["data"], f, ensure_ascii=False, indent=2)
-        
-        await asyncio.to_thread(observe_service.create_event,
-            event_type.saved_dataset(),
-            {"path_to_file": new_dir, "domain": domain, "project_id": project_id}
-        )
-        
+        data=FileManager.load_json(new_dir+"annotated_reviews.json")
+        dataset=Dataset.from_json(data)
+        dataset.domain=domain
+        gen=SamplesGenerator(dataset, project_id)
+        await asyncio.to_thread(gen.generate_dataset)
+        os.makedirs(new_dir+"dat", exist_ok="True")
+        await asyncio.to_thread(FileManager.save_json, new_dir+"generated_dataset.json", gen.generated_dataset.to_json())
+        await asyncio.to_thread(FileManager.save_dat, new_dir+"dat/generated_dataset.train.dat.atepc", gen.generated_dataset.to_dat())
+        dataset.samples=dataset.samples+Dataset.template_dataset().samples
+        await asyncio.to_thread(FileManager.save_dat, new_dir+"dat/annotated_dataset.test.dat.atepc", dataset.to_dat())
         # Обновляем статус при успешном завершении
         DBManager.change_operation_info(project_id, "Dataset generation", 3, 1.0)
         
@@ -370,7 +435,7 @@ async def process_save_reviews_task(data: dict, project_id: int):
 async def process_generate_reviews_task(project_id):
     """Фоновая задача для генерации примеров"""
     try:
-        if DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Not started":
+        if DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Error":
             return
         DBManager.change_operation_info(project_id, "Examples generation", 2, 0.0)
         KDG = KeyDrivenGenerator(project_id)
@@ -392,6 +457,7 @@ async def process_train_model_task(data:dict, project_id):
     try:
         if DBManager.get_operation_info(project_id, "Model training")["status"] != "Not started":
             return
+        
         DBManager.change_operation_info(project_id, "Model training", 2, 0.0)
         dir_name=DBManager.get_project_by_id(project_id).dir_name
         dataset_path=f"{NEW_SAVE_DIR}{dir_name}/dataset/dat"
@@ -403,13 +469,34 @@ async def process_train_model_task(data:dict, project_id):
         DBManager.change_operation_info(project_id,"Model training",4, 0.0)
         print(f"Error in train_model_task: {e}")
 
+
+async def new_process_train_model_task():
+    """Фоновая задача для генерации примеров"""
+    niq=DBManager.next_in_queue()
+    print(niq)
+    while niq:
+        project_id=niq["project_id"]
+        try:
+            DBManager.change_operation_info(project_id, "Model training", 2, 0.0)
+            dir_name=DBManager.get_project_by_id(project_id).dir_name
+            dataset_path=f"{NEW_SAVE_DIR}{dir_name}/dataset/dat"
+            dataset_path=dataset_path.replace("/", "\\")
+            model = await asyncio.to_thread(ABSAModel)
+            await asyncio.to_thread(model.train, project_id, niq["num_epochs"], niq["batch_size"])
+            DBManager.change_operation_info(project_id, "Model training", 3, 1.0)
+            DBManager.complete_queue(project_id)
+        except Exception as e:
+            DBManager.change_operation_info(project_id,"Model training",4, 0.0)
+            print(f"Error in train_model_task: {e}")
+        niq=DBManager.next_in_queue()
+
 async def process_review_analysis_task(project_id):
     """Фоновая задача для анализа отзывов"""
     try:
-        if DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Not started":
+        if DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Not started" and  DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Error":
             return
         DBManager.change_operation_info(project_id, "Review analysis", 2, 0.0)
-        model=ABSAModel()
+        model=await asyncio.to_thread(ABSAModel)
         model.load_model_from_file(project_id)
         await asyncio.to_thread(model.analyse_all_reviews,project_id)
         DBManager.change_operation_info(project_id,"Review analysis",2, 0.7)

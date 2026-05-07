@@ -321,6 +321,22 @@
             transform: none;
         }
 
+        .details-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .details-btn:hover {
+            transform: translateY(-2px);
+        }
+
         /* Загрузчик */
         .loader {
             text-align: center;
@@ -417,8 +433,8 @@
         </div>
     </div>
 
+    <script src="check-auth.js"></script>
     <script>
-        const API_BASE = 'http://127.0.0.1:8000';
         
         // Статусы операций (будут обновляться с сервера)
         let operationsStatus = {
@@ -438,18 +454,24 @@
             return urlParams.get('id');
         }
         
-        // Проверка авторизации
+        // Проверка авторизации и загрузка страницы
         document.addEventListener('DOMContentLoaded', async () => {
-            const accountData = JSON.parse(localStorage.getItem('account_info'));
-            if (!accountData) {
-                window.location.href = '../Account/login.html';
+            // Проверяем токен через функцию из check-auth.js
+            const token = checkAuth();
+            
+            if (!token) {
+                // checkAuth уже перенаправит на страницу логина
                 return;
             }
             
-            window.accessToken = accountData.access_token;
-            window.userLogin = accountData.login;
+            // Получаем информацию о пользователе
+            const userInfo = getCurrentUser();
+            if (userInfo && userInfo.login) {
+                document.getElementById('userLogin').textContent = `👤 ${userInfo.login}`;
+            }
             
-            document.getElementById('userLogin').textContent = window.userLogin;
+            // Сохраняем токен для использования
+            window.accessToken = token;
             
             currentProjectId = getProjectId();
             if (!currentProjectId) {
@@ -474,19 +496,10 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE}/project?project_id=${projectId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${window.accessToken}`
-                    }
+                // Используем authFetch для автоматической подстановки токена
+                const response = await authFetch(`${API_BASE}/project?project_id=${projectId}`, {
+                    method: 'GET'
                 });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    throw new Error(`HTTP ${response.status}`);
-                }
                 
                 const data = await response.json();
                 
@@ -497,7 +510,7 @@
                         for (const op of data.operations_info) {
                             if (operationsStatus[op.type]) {
                                 operationsStatus[op.type].status = op.status;
-                                operationsStatus[op.type].progress = Math.round(op.progress*100) || 0;
+                                operationsStatus[op.type].progress = Math.round(op.progress * 100) || 0;
                             }
                         }
                     }
@@ -508,12 +521,7 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else if (!silent) {
+                if (!silent) {
                     showError('Ошибка соединения с сервером. Проверьте, запущен ли backend.');
                 }
             }
@@ -575,101 +583,10 @@
                             <div class="refresh-info">Последнее обновление: ${lastUpdate}</div>
                         </div>
                         <div class="operations-grid">
-                            <!-- Examples Generation -->
-                            <div class="operation-card ${!isOperationExecutable('Examples generation') && operationsStatus['Examples generation'].status !== 'In progress' ? 'disabled' : ''}" id="card-examples">
-                                <div class="operation-header">
-                                    <div class="operation-type">
-                                        📝 Examples generation
-                                        ${operationsStatus['Examples generation'].status === 'Not started' && !isOperationExecutable('Examples generation') ? '<span class="lock-icon"> 🔒</span>' : ''}
-                                    </div>
-                                </div>
-                                <div class="operation-status ${getStatusClass(operationsStatus['Examples generation'].status)}">${getStatusText(operationsStatus['Examples generation'].status)}</div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar" style="width: ${operationsStatus['Examples generation'].progress}%"></div>
-                                </div>
-                                <div class="progress-text">Прогресс: ${operationsStatus['Examples generation'].progress}%</div>
-                                <div class="operation-actions">
-                                    <button class="run-btn" id="btn-examples" 
-                                        onclick="generateExamples()" 
-                                        ${operationsStatus['Examples generation'].status !== 'Not started' || !isOperationExecutable('Examples generation') ? 'disabled' : ''}>
-                                        ${operationsStatus['Examples generation'].status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Dataset generation -->
-                            <div class="operation-card ${!isOperationExecutable('Dataset generation') && operationsStatus['Dataset generation'].status !== 'In progress' ? 'disabled' : ''}" id="card-dataset">
-                                <div class="operation-header">
-                                    <div class="operation-type">
-                                        📊 Dataset generation
-                                        ${operationsStatus['Dataset generation'].status === 'Not started' && !isOperationExecutable('Dataset generation') ? '<span class="lock-icon"> 🔒</span>' : ''}
-                                    </div>
-                                </div>
-                                <div class="operation-status ${getStatusClass(operationsStatus['Dataset generation'].status)}">${getStatusText(operationsStatus['Dataset generation'].status)}</div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar" style="width: ${operationsStatus['Dataset generation'].progress}%"></div>
-                                </div>
-                                <div class="progress-text">Прогресс: ${operationsStatus['Dataset generation'].progress}%</div>
-                                <div class="operation-actions">
-                                    <button class="run-btn" id="btn-dataset" 
-                                        onclick="generateDataset()" 
-                                        ${operationsStatus['Dataset generation'].status !== 'Not started' || !isOperationExecutable('Dataset generation') ? 'disabled' : ''}>
-                                        ${operationsStatus['Dataset generation'].status === 'In progress' ? 'Выполняется...' : '▶ Аннотировать примеры'}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Model training -->
-                            <div class="operation-card ${!isOperationExecutable('Model training') && operationsStatus['Model training'].status !== 'In progress' ? 'disabled' : ''}" id="card-model">
-                                <div class="operation-header">
-                                    <div class="operation-type">
-                                        🤖 Model training
-                                        ${operationsStatus['Model training'].status === 'Not started' && !isOperationExecutable('Model training') ? '<span class="lock-icon"> 🔒</span>' : ''}
-                                    </div>
-                                </div>
-                                <div class="operation-status ${getStatusClass(operationsStatus['Model training'].status)}">${getStatusText(operationsStatus['Model training'].status)}</div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar" style="width: ${operationsStatus['Model training'].progress}%"></div>
-                                </div>
-                                <div class="progress-text">Прогресс: ${operationsStatus['Model training'].progress}%</div>
-                                <div class="operation-actions" style="display: flex; gap: 10px;">
-                                    <button class="run-btn" id="btn-model" 
-                                        onclick="trainModel()" 
-                                        ${operationsStatus['Model training'].status !== 'Not started' || !isOperationExecutable('Model training') ? 'disabled' : ''}>
-                                        ${operationsStatus['Model training'].status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
-                                    </button>
-                                    ${operationsStatus['Model training'].status === 'Done' || operationsStatus['Model training'].status === 'In progress' ? 
-                                        `<button class="details-btn" onclick="showModelTrainingDetails()" style="background: #17a2b8; color: white; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
-                                            📊 Подробнее
-                                        </button>` : ''}
-                                </div>
-                            </div>
-                            
-                            <!-- Review analysis -->
-                            <div class="operation-card ${!isOperationExecutable('Review analysis') && operationsStatus['Review analysis'].status !== 'In progress' ? 'disabled' : ''}" id="card-review">
-                                <div class="operation-header">
-                                    <div class="operation-type">
-                                        📋 Review analysis
-                                        ${operationsStatus['Review analysis'].status === 'Not started' && !isOperationExecutable('Review analysis') ? '<span class="lock-icon"> 🔒</span>' : ''}
-                                    </div>
-                                </div>
-                                <div class="operation-status ${getStatusClass(operationsStatus['Review analysis'].status)}">${getStatusText(operationsStatus['Review analysis'].status)}</div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar" style="width: ${operationsStatus['Review analysis'].progress}%"></div>
-                                </div>
-                                <div class="progress-text">Прогресс: ${operationsStatus['Review analysis'].progress}%</div>
-                                <div class="operation-actions" style="display: flex; gap: 10px;">
-                                    <button class="run-btn" id="btn-review" 
-                                        onclick="analyzeReviews()" 
-                                        ${operationsStatus['Review analysis'].status !== 'Not started' || !isOperationExecutable('Review analysis') ? 'disabled' : ''}>
-                                        ${operationsStatus['Review analysis'].status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
-                                    </button>
-                                    ${operationsStatus['Review analysis'].status === 'Done' ? 
-                                        `<button class="details-btn" onclick="showReviewAnalysisDashboard()" style="background: #17a2b8; color: white; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
-                                            📊 Результаты
-                                        </button>` : ''}
-                                </div>
-                            </div>
+                            ${generateOperationCard('Examples generation', '📝 Генерация примеров', 'generateExamples', 'examples')}
+                            ${generateOperationCard('Dataset generation', '📊 Генерация размеченного набора примеров', 'generateDataset', 'dataset')}
+                            ${generateOperationCard('Model training', '🤖 Обучение модели', 'trainModel', 'model')}
+                            ${generateOperationCard('Review analysis', '📋 Анализ отзывов', 'analyzeReviews', 'review')}
                         </div>
                     </div>
                 </div>
@@ -679,7 +596,73 @@
             checkAndStartAutoRefresh();
         }
         
-        // УНИКАЛЬНЫЕ ФУНКЦИИ ДЛЯ КАЖДОЙ ОПЕРАЦИИ
+        // Генерация HTML карточки операции
+        function generateOperationCard(opKey, displayName, functionName, idSuffix) {
+            const op = operationsStatus[opKey];
+            const isExecutable = isOperationExecutable(opKey);
+            const isDisabled = op.status === 'In progress' || op.status === 'Done' || (!isExecutable && op.status !== 'In progress');
+            
+            let actionButtons = '';
+            
+            if (opKey === 'Model training' && op.status === 'Done' || op.status === 'In progress') {
+                actionButtons = `
+                    <div class="operation-actions" style="display: flex; gap: 10px;">
+                        <button class="run-btn" id="btn-${idSuffix}" 
+                            onclick="${functionName}()" 
+                            ${isDisabled ? 'disabled' : ''}>
+                            ${op.status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
+                        </button>
+                        <button class="details-btn" onclick="showModelTrainingDetails()">
+                            📊 Подробнее
+                        </button>
+                    </div>
+                `;
+            } else if (opKey === 'Review analysis' && op.status === 'Done') {
+                actionButtons = `
+                    <div class="operation-actions" style="display: flex; gap: 10px;">
+                        <button class="run-btn" id="btn-${idSuffix}" 
+                            onclick="${functionName}()" 
+                            ${isDisabled ? 'disabled' : ''}>
+                            ${op.status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
+                        </button>
+                        <button class="details-btn" onclick="showReviewAnalysisDashboard()">
+                            📊 Результаты
+                        </button>
+                    </div>
+                `;
+            } else {
+                actionButtons = `
+                    <div class="operation-actions">
+                        <button class="run-btn" id="btn-${idSuffix}" 
+                            onclick="${functionName}()" 
+                            ${isDisabled ? 'disabled' : ''}>
+                            ${op.status === 'In progress' ? 'Выполняется...' : '▶ Запустить'}
+                        </button>
+                    </div>
+                `;
+            }
+            
+            const lockHtml = (op.status === 'Not started' && !isExecutable) ? '<span class="lock-icon"> 🔒</span>' : '';
+            
+            return `
+                <div class="operation-card ${!isExecutable && op.status !== 'In progress' ? 'disabled' : ''}" id="card-${idSuffix}">
+                    <div class="operation-header">
+                        <div class="operation-type">
+                            ${displayName}
+                            ${lockHtml}
+                        </div>
+                    </div>
+                    <div class="operation-status ${getStatusClass(op.status)}">${getStatusText(op.status)}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: ${op.progress}%"></div>
+                    </div>
+                    <div class="progress-text">Прогресс: ${op.progress}%</div>
+                    ${actionButtons}
+                </div>
+            `;
+        }
+        
+        // Генерация примеров
         async function generateExamples() {
             const btn = document.getElementById('btn-examples');
             const operationType = 'Examples generation';
@@ -690,31 +673,15 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE}/generate_examples`, {
+                const response = await authFetch(`${API_BASE}/generate_examples`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.accessToken}`
-                    },
-                    body: JSON.stringify({
-                        project_id: currentProjectId
-                    })
+                    body: JSON.stringify({ project_id: currentProjectId })
                 });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
                 
                 const result = await response.json();
                 
-                // Ваш API возвращает {"status": "success"}
                 if (result.status === 'success') {
                     showToast(`Операция "${operationType}" успешно запущена!`);
-                    // Обновляем данные проекта, чтобы увидеть новый статус операции
                     await loadProject(currentProjectId, true);
                 } else {
                     showToast(result.message || 'Ошибка при запуске операции', true);
@@ -725,15 +692,8 @@
                 }
                 
             } catch (error) {
-                console.error('Error running operation:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else {
-                    showToast(`Ошибка: ${error.message}`, true);
-                }
+                console.error('Error:', error);
+                showToast(`Ошибка: ${error.message}`, true);
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = '▶ Запустить';
@@ -741,6 +701,7 @@
             }
         }
         
+        // Генерация датасета
         async function generateDataset() {
             const btn = document.getElementById('btn-dataset');
             const operationType = 'Dataset generation';
@@ -751,37 +712,22 @@
             }
             
             try {
-                // Получаем данные для аннотации с сервера
-                const response = await fetch(`${API_BASE}/get_examples?project_id=${currentProjectId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${window.accessToken}`
-                    }
+                const response = await authFetch(`${API_BASE}/get_examples?project_id=${currentProjectId}`, {
+                    method: 'GET'
                 });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
                 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    // Сохраняем данные в sessionStorage для страницы аннотации
                     const annotationData = {
                         generatedExamples: result.data,
                         domain: result.domain,
                         categories: result.categories,
                         project_id: currentProjectId,
-                        code: Date.now() // уникальный код для процесса
+                        code: Date.now()
                     };
                     
                     sessionStorage.setItem('annotationData', JSON.stringify(annotationData));
-                    
-                    // Переходим на страницу аннотации
                     window.location.href = 'annotation.html';
                 } else {
                     showToast(result.message || 'Ошибка при получении данных для аннотации', true);
@@ -793,14 +739,7 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else {
-                    showToast(`Ошибка: ${error.message}`, true);
-                }
+                showToast(`Ошибка: ${error.message}`, true);
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = '▶ Запустить';
@@ -808,37 +747,23 @@
             }
         }
         
-        // Показать детали обучения модели
-        function showModelTrainingDetails() {
-            // Сохраняем ID проекта в sessionStorage
-            sessionStorage.setItem('modelTrainingDetails', JSON.stringify({
-                project_id: currentProjectId,
-                access_token: window.accessToken
-            }));
-            // Переходим на страницу деталей
-            window.location.href = 'model_training_details.html';
-        }
-
-        
+        // Обучение модели
         async function trainModel() {
             const operationType = 'Model training';
             
-            // Проверяем, доступна ли операция для выполнения
             const isExecutable = isOperationExecutable(operationType);
             if (!isExecutable) {
                 showToast(`Операция "${operationType}" недоступна. Сначала выполните предыдущие операции.`, true);
                 return;
             }
             
-            // Открываем модальное окно с формой параметров обучения
             openTrainModelModal();
         }
-
-        // Открытие модального окна с параметрами обучения
+        
+        // Открытие модального окна
         function openTrainModelModal() {
-            // Создаем модальное окно динамически
             const modalHtml = `
-                <div id="trainModelModal" class="modal-overlay" style="display: flex;">
+                <div id="trainModelModal" class="modal-overlay">
                     <div class="modal-container">
                         <div class="modal-header">
                             <h2>🤖 Обучение модели</h2>
@@ -848,14 +773,14 @@
                             <p class="modal-subtitle">Введите параметры обучения модели ИИ</p>
                             
                             <div class="form-group-modal">
-                                <label for="modalEpochs">Количество эпох</label>
-                                <input type="number" id="modalEpochs" min="1" max="1000" placeholder="Количество этапов обучения модели на датасете">
+                                <label>Количество эпох (1-1000)</label>
+                                <input type="number" id="modalEpochs" min="1" max="1000" placeholder="Например: 10">
                                 <div class="error-text" id="epochsError"></div>
                             </div>
                             
                             <div class="form-group-modal">
-                                <label for="modalBatchSize">Размер батча</label>
-                                <input type="number" id="modalBatchSize" min="1" max="8" placeholder="Размер батча примеров">
+                                <label>Размер батча (1-32)</label>
+                                <input type="number" id="modalBatchSize" min="1" max="32" placeholder="Например: 8">
                                 <div class="error-text" id="batchSizeError"></div>
                             </div>
                             
@@ -869,21 +794,16 @@
                 </div>
             `;
             
-            // Добавляем модальное окно на страницу
             document.body.insertAdjacentHTML('beforeend', modalHtml);
-            
-            // Добавляем стили для модального окна
             addModalStyles();
         }
-
+        
         // Закрытие модального окна
         function closeTrainModelModal() {
             const modal = document.getElementById('trainModelModal');
-            if (modal) {
-                modal.remove();
-            }
+            if (modal) modal.remove();
         }
-
+        
         // Отправка параметров обучения
         async function submitTrainModel() {
             const epochs = document.getElementById('modalEpochs').value;
@@ -892,27 +812,19 @@
             const batchSizeError = document.getElementById('batchSizeError');
             const modalMessage = document.getElementById('modalMessage');
             
-            // Очищаем предыдущие ошибки
             epochsError.textContent = '';
             batchSizeError.textContent = '';
             modalMessage.textContent = '';
             
-            // Валидация
             let isValid = true;
             
-            if (!epochs) {
-                epochsError.textContent = 'Введите количество эпох';
-                isValid = false;
-            } else if (epochs < 1 || epochs > 1000) {
-                epochsError.textContent = 'Количество эпох должно быть от 1 до 1000';
+            if (!epochs || epochs < 1 || epochs > 1000) {
+                epochsError.textContent = 'Введите количество эпох от 1 до 1000';
                 isValid = false;
             }
             
-            if (!batchSize) {
-                batchSizeError.textContent = 'Введите размер батча';
-                isValid = false;
-            } else if (batchSize < 1 || batchSize > 8) {
-                batchSizeError.textContent = 'Размер батча должен быть от 1 до 8';
+            if (!batchSize || batchSize < 1 || batchSize > 32) {
+                batchSizeError.textContent = 'Введите размер батча от 1 до 32';
                 isValid = false;
             }
             
@@ -923,26 +835,14 @@
             submitBtn.textContent = 'Запуск...';
             
             try {
-                const response = await fetch(`${API_BASE}/train_model`, {
+                const response = await authFetch(`${API_BASE}/train_model`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.accessToken}`
-                    },
                     body: JSON.stringify({
                         project_id: currentProjectId,
                         epochs: parseInt(epochs),
                         batch_size: parseInt(batchSize)
                     })
                 });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
                 
                 const result = await response.json();
                 
@@ -962,20 +862,81 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else {
-                    modalMessage.className = 'modal-message error';
-                    modalMessage.textContent = `Ошибка: ${error.message}`;
-                }
+                modalMessage.className = 'modal-message error';
+                modalMessage.textContent = `Ошибка: ${error.message}`;
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Начать обучение';
             }
         }
-
+        
+        // Показать детали обучения модели
+        function showModelTrainingDetails() {
+            sessionStorage.setItem('modelTrainingDetails', JSON.stringify({
+                project_id: currentProjectId,
+                access_token: window.accessToken
+            }));
+            window.location.href = 'model_training_details.html';
+        }
+        
+        // Анализ отзывов
+        async function analyzeReviews() {
+            const operationType = 'Review analysis';
+            
+            const isExecutable = isOperationExecutable(operationType);
+            if (!isExecutable) {
+                showToast(`Операция "${operationType}" недоступна. Сначала выполните обучение модели.`, true);
+                return;
+            }
+            
+            if (operationsStatus[operationType].status === 'In progress') {
+                showToast(`Операция "${operationType}" уже выполняется.`, true);
+                return;
+            }
+            
+            const btn = document.getElementById('btn-review');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Запуск...';
+            }
+            
+            try {
+                const response = await authFetch(`${API_BASE}/analyse_reviews`, {
+                    method: 'POST',
+                    body: JSON.stringify({ project_id: currentProjectId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showToast(`Операция "${operationType}" успешно запущена!`);
+                    await loadProject(currentProjectId, true);
+                } else {
+                    showToast(result.message || 'Ошибка при запуске операции', true);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '▶ Запустить';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(`Ошибка: ${error.message}`, true);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '▶ Запустить';
+                }
+            }
+        }
+        
+        // Показать дашборд с результатами
+        function showReviewAnalysisDashboard() {
+            sessionStorage.setItem('dashboardData', JSON.stringify({
+                project_id: currentProjectId,
+                access_token: window.accessToken
+            }));
+            window.location.href = 'dashboard.html';
+        }
+        
         // Добавление стилей для модального окна
         function addModalStyles() {
             if (document.getElementById('modalStyles')) return;
@@ -993,18 +954,14 @@
                         justify-content: center;
                         align-items: center;
                         z-index: 1000;
-                        animation: fadeIn 0.3s ease;
                     }
-                    
                     .modal-container {
                         background: white;
                         border-radius: 20px;
                         width: 90%;
                         max-width: 500px;
                         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                        animation: slideIn 0.3s ease;
                     }
-                    
                     .modal-header {
                         display: flex;
                         justify-content: space-between;
@@ -1012,40 +969,18 @@
                         padding: 20px 25px;
                         border-bottom: 1px solid #e0e0e0;
                     }
-                    
-                    .modal-header h2 {
-                        color: #333;
-                        margin: 0;
-                        font-size: 22px;
-                    }
-                    
+                    .modal-header h2 { color: #333; margin: 0; font-size: 22px; }
                     .modal-close {
                         background: none;
                         border: none;
                         font-size: 28px;
                         cursor: pointer;
                         color: #999;
-                        transition: color 0.3s;
                     }
-                    
-                    .modal-close:hover {
-                        color: #333;
-                    }
-                    
-                    .modal-body {
-                        padding: 25px;
-                    }
-                    
-                    .modal-subtitle {
-                        color: #666;
-                        font-size: 14px;
-                        margin-bottom: 20px;
-                    }
-                    
-                    .form-group-modal {
-                        margin-bottom: 20px;
-                    }
-                    
+                    .modal-close:hover { color: #333; }
+                    .modal-body { padding: 25px; }
+                    .modal-subtitle { color: #666; font-size: 14px; margin-bottom: 20px; }
+                    .form-group-modal { margin-bottom: 20px; }
                     .form-group-modal label {
                         display: block;
                         margin-bottom: 8px;
@@ -1053,51 +988,27 @@
                         font-weight: 600;
                         font-size: 14px;
                     }
-                    
                     .form-group-modal input {
                         width: 100%;
                         padding: 12px 15px;
                         border: 2px solid #e0e0e0;
                         border-radius: 10px;
                         font-size: 16px;
-                        transition: all 0.3s;
                     }
-                    
                     .form-group-modal input:focus {
                         outline: none;
                         border-color: #667eea;
-                        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
                     }
-                    
-                    .error-text {
-                        color: #ff4757;
-                        font-size: 12px;
-                        margin-top: 5px;
-                    }
-                    
-                    .modal-buttons {
-                        display: flex;
-                        gap: 15px;
-                        margin-top: 25px;
-                    }
-                    
+                    .error-text { color: #ff4757; font-size: 12px; margin-top: 5px; }
+                    .modal-buttons { display: flex; gap: 15px; margin-top: 25px; }
                     .modal-btn-cancel {
                         flex: 1;
                         padding: 12px;
                         background: #e0e0e0;
-                        color: #666;
                         border: none;
                         border-radius: 10px;
-                        font-size: 14px;
-                        font-weight: 600;
                         cursor: pointer;
-                        transition: all 0.3s;
                     }
-                    
-                    .modal-btn-cancel:hover {
-                        background: #ccc;
-                    }
-                    
                     .modal-btn-submit {
                         flex: 1;
                         padding: 12px;
@@ -1105,347 +1016,109 @@
                         color: white;
                         border: none;
                         border-radius: 10px;
-                        font-size: 14px;
-                        font-weight: 600;
                         cursor: pointer;
-                        transition: all 0.3s;
                     }
-                    
-                    .modal-btn-submit:hover:not(:disabled) {
-                        transform: translateY(-2px);
-                        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-                    }
-                    
-                    .modal-btn-submit:disabled {
-                        opacity: 0.6;
-                        cursor: not-allowed;
-                    }
-                    
-                    .modal-message {
-                        margin-top: 15px;
-                        padding: 10px;
-                        border-radius: 8px;
-                        text-align: center;
-                        font-size: 14px;
-                    }
-                    
-                    .modal-message.success {
-                        background: #d4edda;
-                        color: #155724;
-                    }
-                    
-                    .modal-message.error {
-                        background: #f8d7da;
-                        color: #721c24;
-                    }
-                    
-                    @keyframes fadeIn {
-                        from { opacity: 0; }
-                        to { opacity: 1; }
-                    }
-                    
-                    @keyframes slideIn {
-                        from { transform: translateY(-50px); opacity: 0; }
-                        to { transform: translateY(0); opacity: 1; }
-                    }
+                    .modal-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+                    .modal-message { margin-top: 15px; padding: 10px; border-radius: 8px; text-align: center; font-size: 14px; }
+                    .modal-message.success { background: #d4edda; color: #155724; }
+                    .modal-message.error { background: #f8d7da; color: #721c24; }
                 </style>
             `;
-            
             document.head.insertAdjacentHTML('beforeend', styles);
         }
         
-        async function analyzeReviews() {
-            const btn = document.getElementById('btn-review');
-            const operationType = 'Review analysis';
-            
-            // Проверяем, доступна ли операция для выполнения
-            const isExecutable = isOperationExecutable(operationType);
-            if (!isExecutable) {
-                showToast(`Операция "${operationType}" недоступна. Сначала выполните обучение модели.`, true);
-                return;
-            }
-            
-            // Проверяем статус операции
-            if (operationsStatus[operationType].status === 'In progress') {
-                showToast(`Операция "${operationType}" уже выполняется.`, true);
-                return;
-            }
-            
-            if (operationsStatus[operationType].status === 'Done') {
-                showToast(`Операция "${operationType}" уже завершена.`, true);
-                return;
-            }
-            
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Запуск...';
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/analyse_reviews`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.accessToken}`
-                    },
-                    body: JSON.stringify({
-                        project_id: currentProjectId
-                    })
-                });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showToast(`Операция "${operationType}" успешно запущена!`);
-                    // Обновляем данные проекта
-                    await loadProject(currentProjectId, true);
-                } else {
-                    showToast(result.message || 'Ошибка при запуске операции', true);
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.textContent = '▶ Запустить';
-                    }
-                }
-                
-            } catch (error) {
-                console.error('Error running operation:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else {
-                    showToast(`Ошибка: ${error.message}`, true);
-                }
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '▶ Запустить';
-                }
-            }
-        }
-
-        // Показать дашборд с результатами анализа
-        function showReviewAnalysisDashboard() {
-            sessionStorage.setItem('dashboardData', JSON.stringify({
-                project_id: currentProjectId,
-                access_token: window.accessToken
-            }));
-            window.location.href = 'dashboard.html';
-        }
-
-        
-        // Базовая функция отправки запроса
-        async function runOperation(operationType, btnId) {
-            const btn = document.getElementById(btnId);
-            
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Запуск...';
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/run_operation`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${window.accessToken}`
-                    },
-                    body: JSON.stringify({
-                        project_id: currentProjectId,
-                        operation_type: operationType
-                    })
-                });
-                
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Unauthorized');
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'Success') {
-                    showToast(`Операция "${operationType}" успешно запущена!`);
-                    await loadProject(currentProjectId, true);
-                } else {
-                    showToast(result.message || 'Ошибка при запуске операции', true);
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.textContent = '▶ Запустить';
-                    }
-                }
-                
-            } catch (error) {
-                console.error('Error running operation:', error);
-                if (error.message === 'Unauthorized') {
-                    showError('Сессия истекла. Пожалуйста, войдите снова.');
-                    setTimeout(() => {
-                        logout();
-                    }, 2000);
-                } else {
-                    showToast(`Ошибка: ${error.message}`, true);
-                }
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '▶ Запустить';
-                }
-            }
-        }
-        
-        // Запуск автообновления для активной операции
+        // Автообновление
         function checkAndStartAutoRefresh() {
             const hasActiveOperation = Object.values(operationsStatus).some(op => op.status === 'In progress');
             const indicator = document.getElementById('autoRefreshIndicator');
             
             if (hasActiveOperation) {
                 if (!refreshInterval) {
-                    startAutoRefresh();
+                    refreshInterval = setInterval(() => {
+                        if (currentProjectId) loadProject(currentProjectId, true);
+                    }, 5000);
                     indicator.style.display = 'flex';
                 }
             } else {
                 if (refreshInterval) {
-                    stopAutoRefresh();
+                    clearInterval(refreshInterval);
+                    refreshInterval = null;
                     indicator.style.display = 'none';
                 }
             }
         }
         
-        // Запуск автообновления (каждую минуту)
-        function startAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-            refreshInterval = setInterval(() => {
-                if (currentProjectId) {
-                    console.log('Auto-refreshing project data...');
-                    loadProject(currentProjectId, true);
-                }
-            }, 5000);
-        }
-        
-        // Остановка автообновления
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-        
-        // Получение класса CSS для статуса
+        // Вспомогательные функции
         function getStatusClass(status) {
             switch (status) {
-                case 'Not started':
-                    return 'status-not-started';
-                case 'In progress':
-                    return 'status-in-progress';
-                case 'Done':
-                    return 'status-done';
-                case 'Error':
-                    return 'status-error';
-                default:
-                    return 'status-not-started';
+                case 'Not started': return 'status-not-started';
+                case 'In progress': return 'status-in-progress';
+                case 'Done': return 'status-done';
+                case 'Error': return 'status-error';
+                default: return 'status-not-started';
             }
         }
         
-        // Получение текста статуса
         function getStatusText(status) {
             switch (status) {
-                case 'Not started':
-                    return '⏳ Не запущена';
-                case 'In progress':
-                    return '🔄 Выполняется';
-                case 'Done':
-                    return '✅ Завершена';
-                case 'Error':
-                    return '❌ Ошибка';
-                default:
-                    return status;
+                case 'Not started': return '⏳ Не запущена';
+                case 'In progress': return '🔄 Выполняется';
+                case 'Done': return '✅ Завершена';
+                case 'Error': return '❌ Ошибка';
+                default: return status;
             }
         }
         
-        // Форматирование даты
         function formatDate(dateString) {
             if (!dateString) return 'Дата неизвестна';
-            
             try {
                 const date = new Date(dateString);
                 if (isNaN(date.getTime())) return dateString;
-                
                 return date.toLocaleDateString('ru-RU', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    year: 'numeric', month: 'long', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
                 });
             } catch (e) {
                 return dateString;
             }
         }
         
-        // Показ уведомления
         function showToast(message, isError = false) {
             const toast = document.createElement('div');
             toast.className = 'toast-message';
             toast.style.background = isError ? '#dc3545' : '#28a745';
             toast.textContent = message;
             document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
+            setTimeout(() => toast.remove(), 3000);
         }
         
-        // Отображение ошибки
         function showError(message) {
             const contentDiv = document.getElementById('content');
             contentDiv.innerHTML = `
                 <div class="content-card">
-                    <div class="error-message">
-                        ❌ ${escapeHtml(message)}
-                    </div>
+                    <div class="error-message">❌ ${escapeHtml(message)}</div>
                     <button class="back-btn" onclick="goBack()" style="width: 100%; justify-content: center;">← Вернуться к проектам</button>
                 </div>
             `;
         }
         
-        // Навигация
         function goBack() {
-            stopAutoRefresh();
-            window.location.href = 'projects.html';
+            if (refreshInterval) clearInterval(refreshInterval);
+            window.location.href = 'Projects.html';
         }
         
-        // Выход из системы
-        function logout() {
-            stopAutoRefresh();
-            localStorage.removeItem('account_info');
-            window.location.href = '../Account/login.html';
-        }
-        
-        // Защита от XSS
         function escapeHtml(str) {
             if (!str) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
         }
         
-        // Остановка автообновления при уходе со страницы
         window.addEventListener('beforeunload', () => {
-            stopAutoRefresh();
+            if (refreshInterval) clearInterval(refreshInterval);
         });
     </script>
 </body>

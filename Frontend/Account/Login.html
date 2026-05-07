@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <title>Вход</title>
     <style>
         * {
@@ -127,11 +128,11 @@
         <form id="loginForm">
             <div class="form-group">
                 <label>Логин</label>
-                <input type="text" id="login" name="login" required>
+                <input type="text" id="login" name="login" required autocomplete="username">
             </div>
             <div class="form-group">
                 <label>Пароль</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             <button type="submit" id="submitBtn">Войти</button>
         </form>
@@ -141,21 +142,26 @@
         </div>
     </div>
 
+    <script src="check-auth.js"></script>
     <script>
-        const API_BASE = 'http://127.0.0.1:8000';
-        
-        // Проверяем, сохранялся ли токен при обновлении страницы
-        const savedToken = localStorage.getItem('access_token');
-        if (savedToken) {
-            // Можно проверить валидность токена или сразу перенаправить
-            console.log('Уже авторизован');
-            // window.location.href = '/dashboard';
+        async function hashPassword(password) {
+            const hashed = CryptoJS.SHA256(password).toString();
+            return hashed;
         }
+        // Проверяем, сохранялся ли токен при обновлении страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = getAuthToken();
+            if (token) {
+                console.log('Уже авторизован');
+                // Можно перенаправить на страницу проектов
+                window.location.href = '../Projects/Projects.html';
+            }
+        });
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const login = document.getElementById('login').value;
+            const login = document.getElementById('login').value.trim();
             const password = document.getElementById('password').value;
             const submitBtn = document.getElementById('submitBtn');
             
@@ -168,24 +174,41 @@
             submitBtn.textContent = 'Вход...';
             
             try {
+                const hashedPassword = await hashPassword(password);
+
                 const response = await fetch(`${API_BASE}/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ login, password })
+                    body: JSON.stringify({ login, password: hashedPassword })
                 });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Неверный логин или пароль');
+                    } else if (response.status === 403) {
+                        throw new Error('Доступ запрещен');
+                    } else {
+                        throw new Error(`Ошибка сервера: ${response.status}`);
+                    }
+                }
                 
                 const data = await response.json();
                 
                 if (data.status === 'Success') {
-                    // Сохраняем токен
+                    // Используем функцию parseJWT из check-auth.js
+                    const decodedToken = parseJWT(data.message);
+                    
                     const account_info = {
-                            "access_token":data.message,
-                            "login":login
-                        };
+                        "access_token": data.message,
+                        "login": login,
+                        "expires_at": decodedToken?.exp,
+                        "user_id": decodedToken?.sub
+                    };
+                    
                     localStorage.setItem('account_info', JSON.stringify(account_info));
-                    showMessage('Вход выполнен успешно!', 'success');
+                    showMessage('Вход выполнен успешно! Перенаправление...', 'success');
+                    
                     setTimeout(() => {
                         window.location.href = '../Projects/Projects.html';
                     }, 1500);
@@ -193,8 +216,15 @@
                     showMessage(data.message || 'Ошибка входа', 'error');
                 }
             } catch (error) {
-                showMessage('Ошибка соединения с сервером', 'error');
-                console.error('Error:', error);
+                console.error('Ошибка:', error);
+                
+                if (error.message.includes('Failed to fetch')) {
+                    showMessage('Не удается подключиться к серверу. Проверьте, запущен ли сервер.', 'error');
+                } else if (error.message.includes('401') || error.message.includes('403')) {
+                    showMessage('Неверный логин или пароль', 'error');
+                } else {
+                    showMessage(error.message || 'Ошибка при выполнении запроса', 'error');
+                }
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Войти';
@@ -213,10 +243,25 @@
         }
         
         // Добавляем возможность войти по Enter
-        document.getElementById('loginForm').addEventListener('keypress', (e) => {
+        document.getElementById('password').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 document.getElementById('submitBtn').click();
+            }
+        });
+        
+        // Очистка сообщения при вводе данных
+        document.getElementById('login').addEventListener('input', () => {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv.style.display === 'block') {
+                messageDiv.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('password').addEventListener('input', () => {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv.style.display === 'block') {
+                messageDiv.style.display = 'none';
             }
         });
     </script>

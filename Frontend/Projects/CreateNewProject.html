@@ -370,12 +370,13 @@
                 <span v-else>✅ Создать проект</span>
             </button>
             
-            <div class="success-message" v-if="successMsg">{{ successMsg }}</div>
-            <div class="error-global" v-if="errorMsg">{{ errorMsg }}</div>
+            <div class="success-message" v-if="successMsg" style="display: block;">{{ successMsg }}</div>
+            <div class="error-global" v-if="errorMsg" style="display: block;">{{ errorMsg }}</div>
         </div>
     </div>
 </div>
 
+<script src="../Account/check-auth.js"></script>
 <script>
 new Vue({
     el: '#app',
@@ -390,7 +391,8 @@ new Vue({
         examples: [],
         isLoading: false,
         successMsg: '',
-        errorMsg: ''
+        errorMsg: '',
+        tokenCheckInterval: null
     },
     computed: {
         isFormValid() {
@@ -403,33 +405,91 @@ new Vue({
         }
     },
     mounted() {
-        // Проверка авторизации
+        // Проверяем наличие токена напрямую из localStorage
         const accountData = localStorage.getItem('account_info');
+        
         if (!accountData) {
-            window.location.href = '../Account/login.html';
+            console.log('No account data, redirecting to login');
+            window.location.href = '../Account/Login.html';
             return;
         }
         
         try {
             const account = JSON.parse(accountData);
-            this.userLogin = account.login || '';
-            this.accessToken = account.access_token || '';
             
-            if (!this.accessToken || !this.userLogin) {
-                window.location.href = '../Account/login.html';
+            // Проверяем валидность токена
+            if (!account.access_token) {
+                console.log('No access token, redirecting to login');
+                window.location.href = '../Account/Login.html';
+                return;
             }
+            
+            // Проверяем срок действия токена
+            const isValid = isTokenValid(account.access_token);
+            if (!isValid) {
+                console.log('Token expired, redirecting to login');
+                localStorage.removeItem('account_info');
+                window.location.href = '../Account/Login.html';
+                return;
+            }
+            
+            this.userLogin = account.login || '';
+            this.accessToken = account.access_token;
+            
+            console.log('User authenticated:', this.userLogin);
+            
         } catch (e) {
-            window.location.href = '../Account/login.html';
+            console.error('Error parsing account info:', e);
+            window.location.href = '../Account/Login.html';
+            return;
         }
+        
+        // Запускаем периодическую проверку токена
+        this.startTokenCheck();
     },
+    
+    beforeDestroy() {
+        this.stopTokenCheck();
+    },
+    
     methods: {
+        startTokenCheck() {
+            this.tokenCheckInterval = setInterval(() => {
+                const accountData = localStorage.getItem('account_info');
+                if (accountData) {
+                    try {
+                        const account = JSON.parse(accountData);
+                        if (!isTokenValid(account.access_token)) {
+                            console.log('Token expired during session');
+                            this.stopTokenCheck();
+                            this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                            setTimeout(() => {
+                                this.logout();
+                            }, 2000);
+                        }
+                    } catch (e) {
+                        console.error('Error checking token:', e);
+                    }
+                }
+            }, 300000); // 5 минут
+        },
+        
+        stopTokenCheck() {
+            if (this.tokenCheckInterval) {
+                clearInterval(this.tokenCheckInterval);
+                this.tokenCheckInterval = null;
+            }
+        },
+        
         goBack() {
-            window.location.href = 'projects.html';
+            this.stopTokenCheck();
+            window.location.href = 'Projects.html';
         },
         
         logout() {
+            this.stopTokenCheck();
             localStorage.removeItem('account_info');
-            window.location.href = '../Account/login.html';
+            window.location.href = '../Account/Login.html';
         },
         
         addCategory() {
@@ -445,7 +505,7 @@ new Vue({
         },
         
         triggerFileInput() { 
-            $('#fileInput').trigger('click'); 
+            document.getElementById('fileInput').click(); 
         },
         
         handleFileSelect(event) {
@@ -472,7 +532,7 @@ new Vue({
                     setTimeout(() => { this.successMsg = ''; }, 3000);
                 },
                 error: (error) => {
-                    this.errorMsg = "Ошибка при загрузке файла: " + error;
+                    this.errorMsg = "Ошибка при загрузке файла: " + error.message;
                     this.uploadedFile = null;
                     this.examples = [];
                 }
@@ -486,13 +546,36 @@ new Vue({
                 return;
             }
             
+            // Проверяем токен перед отправкой
+            const accountData = localStorage.getItem('account_info');
+            if (!accountData) {
+                this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                setTimeout(() => this.logout(), 2000);
+                return;
+            }
+            
+            let token;
+            try {
+                const account = JSON.parse(accountData);
+                token = account.access_token;
+                if (!isTokenValid(token)) {
+                    this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                    setTimeout(() => this.logout(), 2000);
+                    return;
+                }
+            } catch (e) {
+                this.errorMsg = 'Ошибка авторизации';
+                setTimeout(() => this.logout(), 2000);
+                return;
+            }
+            
             this.isLoading = true;
             this.errorMsg = '';
             
             const requestData = {
-                name: this.projectName,
-                domain: this.domain,
-                categories: this.categories.map(c => c.value),
+                name: this.projectName.trim(),
+                domain: this.domain.trim(),
+                categories: this.categories.map(c => c.value.trim()),
                 examples: this.examples
             };
             
@@ -501,19 +584,23 @@ new Vue({
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.accessToken}`
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify(requestData)
                 });
                 
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error('Unauthorized');
+                }
+                
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
                 }
                 
                 const result = await response.json();
                 
-                if (result.status === 'Success!' || result.status === 'Success') {
+                if (result.status === 'Success!' || result.status === 'Success' || result.status === 'success') {
                     this.successMsg = result.message || 'Проект успешно создан! Перенаправление на страницу проектов...';
                     
                     // Очищаем форму
@@ -524,23 +611,27 @@ new Vue({
                     this.examples = [];
                     
                     setTimeout(() => {
-                        window.location.href = 'projects.html';
+                        window.location.href = 'Projects.html';
                     }, 2000);
                 } else {
                     this.errorMsg = result.message || 'Ошибка при создании проекта';
                 }
                 
             } catch (err) {
-                if (err.message.includes('Failed to fetch')) {
-                    this.errorMsg = '❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен по адресу http://127.0.0.1:8000';
-                } else if (err.message.includes('401')) {
+                console.error('Create project error:', err);
+                
+                if (err.message === 'Unauthorized') {
                     this.errorMsg = '❌ Сессия истекла. Пожалуйста, войдите заново.';
-                    setTimeout(() => {
-                        this.logout();
-                    }, 2000);
+                    setTimeout(() => this.logout(), 2000);
+                } else if (err.message.includes('Failed to fetch')) {
+                    this.errorMsg = '❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.';
                 } else {
                     this.errorMsg = `❌ Ошибка: ${err.message}`;
                 }
+                
+                setTimeout(() => { 
+                    if (this.errorMsg) this.errorMsg = ''; 
+                }, 5000);
             } finally {
                 this.isLoading = false;
             }
