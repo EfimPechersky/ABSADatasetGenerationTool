@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аннотация данных</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 900px; margin: 0 auto; }
+        
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #667eea;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+        .back-btn:hover {
+            background: #f0f0f0;
+            transform: translateX(-3px);
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .user-login {
+            color: #666;
+            font-weight: 500;
+        }
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+        
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chart-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .chart-title { text-align: center; color: #333; margin-bottom: 20px; font-size: 20px; font-weight: 600; }
+        .chart-item { margin-bottom: 20px; animation: fadeInChart 0.5s ease-out; }
+        @keyframes fadeInChart {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .label-container { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 500; }
+        .category-name-chart { color: #555; text-transform: capitalize; }
+        .percentage { color: #764ba2; font-weight: bold; }
+        .bar-container {
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 40px;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 40px;
+        }
+        .chart-stats {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .total-annotated { color: #666; font-size: 14px; }
+        .total-annotated span { color: #764ba2; font-weight: bold; font-size: 18px; }
+        .legend { display: flex; gap: 15px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #666; }
+        .legend-color { width: 12px; height: 12px; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 3px; }
+        .btn-space { margin-right: 10px; }
+        .wtoken span:not(.skip):hover {
+            background-color: #f4fb61;
+            opacity: 0.8;
+            cursor: pointer;
+            transition: 0.2s;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        .wtoken span.active {
+            background-color: #f4fb61;
+            opacity: 0.8;
+            font: bold 1.05rem "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        select.OverallMarked { font: bold 0.95rem "Segoe UI", Roboto, "Helvetica Neue", Arial !important; }
+        .a-Pos { background-color: #198754 !important; color: white !important; }
+        .a-Neu { background-color: #6c757d !important; color: white !important; }
+        .a-Neg { background-color: #dc3545 !important; color: white !important; }
+        .popover { max-width: 500px !important; }
+        .popClose { cursor: pointer; }
+        .project-id-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-left: 15px;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        @media (max-width: 600px) {
+            .container-custom { max-width: 100%; }
+            .form-card, .chart-container { padding: 20px; }
+            .bar { font-size: 11px; padding-right: 5px; }
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            .header-left {
+                flex-direction: column;
+                width: 100%;
+            }
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <button class="back-btn" @click="goBackToProject">← Назад к проекту</button>
+                <h1>📝 Аннотация данных</h1>
+                <span class="project-id-badge">Проект ID: {{ projectId }}</span>
+            </div>
+            <div class="user-info">
+                <span class="user-login">{{ userLogin }}</span>
+                <button class="logout-btn" @click="logout">Выйти</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container-custom">
+        <div class="chart-container">
+            <div class="chart-title">
+                📊 Прогресс аннотации по категориям
+            </div>
+            <div id="annotationChart" class="chart">
+                <div v-for="item in chartData" :key="item.category" class="chart-item">
+                    <div class="label-container">
+                        <span class="category-name-chart">{{ item.category }}</span>
+                        <span class="percentage">{{ item.percentage.toFixed(1) }}% </span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar" :style="{ width: item.percentage + '%' }">
+                            <span v-if="item.percentage > 8">{{ item.annotated }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-stats">
+                <div class="total-annotated">
+                    Всего аннотировано: <span>{{ totalAnnotated }}</span>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color"></div>
+                        <span>Процент аннотированных примеров</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container-custom" v-if="!currentReview && !isLoading">
+        <div class="alert alert-warning">
+            <i class="bi bi-info-circle"></i> 
+            Нет данных для аннотации. Пожалуйста, вернитесь к проекту и запустите генерацию датасета заново.
+        </div>
+    </div>
+    
+    <div class="container-custom" v-if="currentReview">
+        <div class="form-card">
+            <h5 class="card-header" style="background: #f8f9fa;">
+                <span>
+                    Аннотация данных - {{ currentDomain }}
+                    <span class="badge bg-info" style="margin-left: 10px;">ID: {{ currentReview ? currentReview.rvid : '' }}</span>
+                    <span class="badge bg-secondary" style="margin-left: 10px;">Сохранено: {{ savedCount }}</span>
+                    <span class="badge bg-warning" style="margin-left: 10px;">Осталось: {{ remainingReviews }}</span>
+                </span>
+            </h5>
+            
+            <div class="card-body">
+                <div>
+                    <button class="btn btn-warning btn-space" @click="resetReview">🔄 Следующий отзыв</button>
+                    <button class="btn btn-success btn-space" @click="saveReview">💾 Сохранить</button>
+                    <button class="btn btn-info btn-space" @click="exportAll" v-if="savedCount > 0">📤 Экспорт и завершить ({{ savedCount }})</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <br>
+    
+    <div class="container-custom" v-if="currentReview">
+        <div class="form-card">
+            <table class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width:80px;">Категория</th>
+                        <th scope="col">Текст</th>
+                        <th scope="col" style="width:150px;">Общая тональность</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">{{ currentCategoryName }}</th>
+                        <td>
+                            <span class="wtoken">
+                                <span v-for="(item, index) in currentReview.rvarr" 
+                                        :key="item.tkid"
+                                        :id="item.tkid"
+                                        :class="getTokenClass(item)"
+                                        @click="onTokenClick($event, currentReview.rvarr, item, index)"
+                                        v-if="item.tk && item.tk.trim() !== ''">
+                                    {{ index === 0 ? item.tk : (!item.tk.match(/\p{P}/gu) ? ' ' + item.tk : item.tk) }}
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm" 
+                                    :class="getOverallClass(currentReview.Overall)"
+                                    v-model="currentReview.Overall">
+                                <option value="">Выберите...</option>
+                                <option class="a-Pos" value="Pos">Положительный</option>
+                                <option class="a-Neu" value="Neu">Нейтральный</option>
+                                <option class="a-Neg" value="Neg">Отрицательный</option>
+                            </select>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="check-auth.js"></script>
+<script>
+
+new Vue({
+    el: '#app',
+    data: {
+        generatedExamples: {},
+        projectId: null,
+        currentDomain: '',
+        categories: [],
+        allReviews: [],
+        savedReviews: [],
+        currentReview: null,
+        currentCategoryIndex: 0,
+        totalReviews: 0,
+        savedCount: 0,
+        indexes: {},
+        annotatedCounts: {},
+        userLogin: '',
+        accessToken: '',
+        isLoading: true,
+        tokenCheckInterval: null
+    },
+    computed: {
+        currentCategoryName() {
+            return this.categories[this.currentCategoryIndex] || '';
+        },
+        
+        chartData() {
+            const data = [];
+            let total = 0;
+            for (let i = 0; i < this.categories.length; i++) {
+                const categoryName = this.categories[i];
+                total += this.annotatedCounts[categoryName] || 0;
+            }
+            for (let i = 0; i < this.categories.length; i++) {
+                const categoryName = this.categories[i];
+                const annotated = this.annotatedCounts[categoryName] || 0;
+                const percentage = total > 0 ? (annotated / total) * 100 : 0;
+                
+                data.push({
+                    category: categoryName,
+                    annotated: annotated,
+                    total: total,
+                    percentage: percentage
+                });
+            }
+            return data.sort((a, b) => b.percentage - a.percentage);
+        },
+        
+        totalAnnotated() {
+            return Object.values(this.annotatedCounts).reduce((sum, val) => sum + val, 0);
+        },
+        
+        remainingReviews() {
+            return this.totalReviews - this.savedCount;
+        }
+    },
+    
+    mounted() {
+        // Проверка авторизации через check-auth.js
+        const token = checkAuth();
+        
+        if (!token) {
+            // checkAuth уже перенаправит на страницу логина
+            return;
+        }
+        
+        // Получаем информацию о пользователе
+        const userInfo = getCurrentUser();
+        if (userInfo && userInfo.login) {
+            this.userLogin = userInfo.login;
+            this.accessToken = token;
+        } else {
+            // Пробуем альтернативный способ
+            const accountData = localStorage.getItem('account_info');
+            if (accountData) {
+                try {
+                    const account = JSON.parse(accountData);
+                    this.userLogin = account.login || '';
+                    this.accessToken = account.access_token || '';
+                } catch (e) {
+                    console.error('Error parsing account info:', e);
+                    logout();
+                }
+            } else {
+                logout();
+            }
+        }
+        
+        // Получаем данные из sessionStorage
+        const savedData = sessionStorage.getItem('annotationData');
+        if (!savedData) {
+            alert('Данные не найдены. Пожалуйста, начните с проекта.');
+            window.location.href = 'Projects.html';
+            return;
+        }
+        
+        try {
+            const data = JSON.parse(savedData);
+            this.generatedExamples = data.generatedExamples;
+            this.currentDomain = data.domain;
+            this.categories = data.categories;
+            this.projectId = data.project_id;
+            
+            this.initAnnotation();
+        } catch (e) {
+            console.error('Error parsing annotation data:', e);
+            alert('Ошибка загрузки данных аннотации');
+            window.location.href = 'Projects.html';
+        }
+        
+        // Запускаем периодическую проверку токена
+        this.startTokenCheck();
+    },
+    
+    beforeDestroy() {
+        this.stopTokenCheck();
+    },
+    
+    methods: {
+        startTokenCheck() {
+            this.tokenCheckInterval = setInterval(() => {
+                const token = getAuthToken();
+                if (!token) {
+                    this.stopTokenCheck();
+                    alert('Сессия истекла. Пожалуйста, войдите снова.');
+                    this.logout();
+                }
+            }, 300000); // 5 минут
+        },
+        
+        stopTokenCheck() {
+            if (this.tokenCheckInterval) {
+                clearInterval(this.tokenCheckInterval);
+                this.tokenCheckInterval = null;
+            }
+        },
+        
+        initAnnotation() {
+            // Проверяем, что данные существуют
+            if (!this.generatedExamples || Object.keys(this.generatedExamples).length === 0) {
+                this.isLoading = false;
+                return;
+            }
+            
+            Object.keys(this.generatedExamples).forEach(key => {
+                let examples = this.generatedExamples[key].map((text, idx) => {
+                    let words = text.split(' ').filter(w => w && w.trim().length > 0);
+                    return {
+                        rvid: idx + 1,
+                        rvarr: words.map((word, wordIdx) => ({
+                            tkid: `R${idx + 1}_${wordIdx}`,
+                            tk: word,
+                            aspect: false,
+                            sentiment: null
+                        })),
+                        Overall: '',
+                        category: key
+                    };
+                });
+                this.indexes[key] = -1;
+                this.totalReviews += examples.length;
+                this.allReviews[key] = examples;
+            });
+            
+            // Инициализируем счетчики аннотаций
+            for (let i = 0; i < this.categories.length; i++) {
+                const categoryName = this.categories[i];
+                this.annotatedCounts[categoryName] = 0;
+            }
+            
+            // Проверяем, есть ли вообще отзывы для аннотации
+            if (this.categories.length > 0 && this.allReviews[this.categories[0]] && this.allReviews[this.categories[0]].length > 0) {
+                this.currentCategoryIndex = 0;
+                this.indexes[this.categories[0]] += 1;
+                this.currentReview = this.allReviews[this.categories[0]][0];
+            }
+            
+            this.isLoading = false;
+        },
+        
+        updateChart() {
+            // Пересчитываем счетчики аннотированных примеров
+            const newCounts = {};
+            for (let i = 0; i < this.categories.length; i++) {
+                newCounts[this.categories[i]] = 0;
+            }
+            
+            this.savedReviews.forEach(review => {
+                if (review.category) {
+                    newCounts[review.category] = (newCounts[review.category] || 0) + 1;
+                }
+            });
+            
+            this.annotatedCounts = newCounts;
+            this.$forceUpdate();
+        },
+        
+        resetReview() {
+            if (this.categories.length === 0) return;
+            
+            this.indexes[this.categories[this.currentCategoryIndex]] += 1;
+            let index = this.indexes[this.categories[this.currentCategoryIndex]];
+            
+            while (index >= this.allReviews[this.categories[this.currentCategoryIndex]].length) {
+                this.currentCategoryIndex += 1;
+                if (this.currentCategoryIndex >= this.categories.length) {
+                    // Все категории закончились
+                    alert('Поздравляем! Вы аннотировали все примеры!');
+                    this.currentReview = null;
+                    return;
+                }
+                this.indexes[this.categories[this.currentCategoryIndex]] += 1;
+                index = this.indexes[this.categories[this.currentCategoryIndex]];
+            }
+            this.currentReview = this.allReviews[this.categories[this.currentCategoryIndex]][index];
+            $('.popover').remove();
+        },
+        
+        saveReview() {
+            if (!this.currentReview) return;
+            
+            if (!this.currentReview.Overall) {
+                alert("Пожалуйста, выберите общую тональность");
+                return;
+            }
+            
+            const hasAspect = this.currentReview.rvarr.some(item => item.aspect === true);
+            if (!hasAspect) {
+                alert("Пожалуйста, отметьте хотя бы один аспект");
+                return;
+            }
+            
+            this.currentReview.category = this.categories[this.currentCategoryIndex];
+            this.savedReviews.push(JSON.parse(JSON.stringify(this.currentReview)));
+            this.savedCount = this.savedReviews.length;
+            this.annotatedCounts[this.currentReview.category] = (this.annotatedCounts[this.currentReview.category] || 0) + 1;
+            this.updateChart();
+            
+            this.indexes[this.categories[this.currentCategoryIndex]] += 1;
+            this.currentCategoryIndex += 1;
+            if (this.currentCategoryIndex >= this.categories.length) {
+                this.currentCategoryIndex = 0;
+            }
+            this.resetReview();
+        },
+        
+        async exportAll() {
+            if (this.savedReviews.length === 0) {
+                alert("Нет сохраненных отзывов для экспорта");
+                return;
+            }
+            
+            // Проверяем валидность токена перед отправкой
+            const token = getAuthToken();
+            if (!token) {
+                alert('Сессия истекла. Пожалуйста, войдите снова.');
+                this.logout();
+                return;
+            }
+            
+            await this.exportReviews(this.savedReviews);
+        },
+        
+        async exportReviews(reviews) {
+            const btn = document.querySelector('.btn-info');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Отправка...';
+            }
+            
+            try {
+                let jsonformat = [];
+                reviews.forEach(review => {
+                    let new_review = [];
+                    let new_aspects = {};
+                    
+                    let words = review.rvarr.map(w => w.tk);
+                    let sentence = words.map((w, i) => 
+                        i === 0 ? w : ' ' + w
+                    ).join('');
+                    
+                    new_review.push(sentence.replace(/"/g, "'"));
+                    
+                    review.rvarr.forEach((item) => {
+                        if (item.aspect && item.sentiment) {
+                            let sentiment = item.sentiment === "Pos" ? "Positive" :
+                                        item.sentiment === "Neu" ? "Neutral" : "Negative";
+                            new_aspects[item.tk.replace(/[,.!]/g, "")] = sentiment;
+                        }
+                    });
+                    
+                    new_review.push(new_aspects);
+                    jsonformat.push(new_review);
+                });
+                
+                const requestData = {
+                    data: jsonformat,
+                    project_id: this.projectId
+                };
+                
+                // Используем authFetch для автоматической подстановки токена
+                const response = await authFetch(`${API_BASE}/save-reviews`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(`Успешно отправлено ${reviews.length} отзывов на сервер`);
+                    // Очищаем sessionStorage
+                    sessionStorage.removeItem('annotationData');
+                    window.location.href = `Project.html?id=${this.projectId}`;
+                } else {
+                    alert(result.message || 'Ошибка при отправке');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '📤 Экспорт и завершить';
+                    }
+                }
+                
+            } catch (err) {
+                console.error('Ошибка при отправке на сервер:', err);
+                
+                if (err.message === 'Session expired' || err.message === 'No auth token') {
+                    alert('Сессия истекла. Пожалуйста, войдите снова.');
+                    this.logout();
+                } else if (err.message.includes('Failed to fetch')) {
+                    alert(`❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.`);
+                } else {
+                    alert(`❌ Ошибка при отправке данных: ${err.message}`);
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '📤 Экспорт и завершить';
+                }
+            }
+        },
+        
+        getOverallClass(value) {
+            return !value ? "form-select form-select-sm" : "form-select form-select-sm OverallMarked a-" + value;
+        },
+        
+        getTokenClass(item) {
+            if (!item.aspect) return "";
+            switch(item.sentiment) {
+                case "Pos": return "active a-Pos";
+                case "Neu": return "active a-Neu";
+                case "Neg": return "active a-Neg";
+                default: return "active";
+            }
+        },
+        
+        onTokenClick(event, reviewArr, item, index) {
+            if (!item.tk || item.tk.trim().length === 0) return;
+            
+            let target = event.target;
+            let tkspanid = target.id;
+            
+            $('.popover').remove();
+            
+            if (!$(target).hasClass('a-Pos') && !$(target).hasClass('a-Neu') && !$(target).hasClass('a-Neg')) {
+                $(target).toggleClass("active");
+            }
+            
+            let popover = new bootstrap.Popover(target, {
+                placement: "top",
+                trigger: "manual",
+                html: true,
+                sanitize: false,
+                title: '<div class="float-end popClose"><i class="bi bi-x-square"></i></div>',
+                content: '<div id="pop_' + tkspanid + '" class="btn-group" role="group">' +
+                    '<button id="Pos" type="button" class="btn btn-success btn-sm">Позитивный</button>' +
+                    '<button id="Neu" type="button" class="btn btn-secondary btn-sm">Нейтральный</button>' +
+                    '<button id="Neg" type="button" class="btn btn-danger btn-sm">Негативный</button>' +
+                    '<button id="Del" type="button" class="btn btn-primary btn-sm">Очистить</button>' +
+                    '</div>'
+            });
+            
+            popover.show();
+            
+            $(target).one("shown.bs.popover", function() {
+                $(".popClose").on("click", function() {
+                    popover.dispose();
+                    if (!$(target).hasClass('a-Pos') && !$(target).hasClass('a-Neu') && !$(target).hasClass('a-Neg')) {
+                        $(target).removeClass("active");
+                    }
+                });
+                
+                $("#pop_" + tkspanid + " .btn").on("click", function(e) {
+                    popover.dispose();
+                    
+                    if (e.target.id === 'Del') {
+                        $(target).removeClass(["a-Pos", "a-Neu", "a-Neg", "active"]);
+                        item.aspect = false;
+                        item.sentiment = null;
+                    } else {
+                        $(target).removeClass(["a-Pos", "a-Neu", "a-Neg"]).addClass("a-" + e.target.id);
+                        item.aspect = true;
+                        item.sentiment = e.target.id;
+                    }
+                    
+                    this.$forceUpdate();
+                }.bind(this));
+            }.bind(this));
+        },
+        
+        goBackToProject() {
+            this.stopTokenCheck();
+            if (this.projectId) {
+                window.location.href = `Project.html?id=${this.projectId}`;
+            } else {
+                window.location.href = 'Projects.html';
+            }
+        },
+        
+        logout() {
+            this.stopTokenCheck();
+            localStorage.removeItem('account_info');
+            sessionStorage.removeItem('annotationData');
+            window.location.href = '../Account/Login.html';
+        }
+    }
+});
+</script>
+</body>
+</html>

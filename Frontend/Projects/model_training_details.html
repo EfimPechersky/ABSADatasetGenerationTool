@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детали обучения модели</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js для графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 1000px; margin: 0 auto; }
+        
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #667eea;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+        .back-btn:hover {
+            background: #f0f0f0;
+            transform: translateX(-3px);
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .user-login {
+            color: #666;
+            font-weight: 500;
+        }
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+        
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        canvas {
+            max-height: 400px;
+            width: 100%;
+        }
+        .metrics-summary {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+        .metric-card h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            opacity: 0.9;
+        }
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .badge-epoche {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        .epochs-table {
+            margin-top: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .epochs-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .epochs-table th, .epochs-table td {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .epochs-table th {
+            background: #667eea;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+        .epochs-table tr:hover {
+            background: #f8f9fa;
+        }
+        .loader {
+            text-align: center;
+            padding: 60px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .refresh-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover {
+            background: #218838;
+        }
+        .auto-refresh-badge {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
+        }
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            .header-left {
+                flex-direction: column;
+                width: 100%;
+            }
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <div class="header">
+            <div class="header-left">
+                <button class="back-btn" @click="goBack">← Назад к проекту</button>
+                <h1>📊 Детали обучения модели</h1>
+            </div>
+            <div class="user-info">
+                <span class="user-login">{{ userLogin }}</span>
+                <button class="logout-btn" @click="logout">Выйти</button>
+            </div>
+        </div>
+        
+        <div class="form-card">
+            <div class="training-container">
+                <h3>🤖 Результаты обучения модели</h3>
+                
+                <div v-if="isLoading" class="loader">
+                    <div class="spinner"></div>
+                    <p>Загрузка данных...</p>
+                </div>
+                
+                <div v-else-if="errorMsg" class="error-message">
+                    ❌ {{ errorMsg }}
+                </div>
+                
+                <div v-else-if="trainingNotStarted" class="info-message">
+                    <i class="bi bi-info-circle"></i> Обучение модели еще не начато.
+                    <br>Вернитесь к проекту и запустите обучение модели.
+                </div>
+                
+                <div v-else>
+                    <div style="margin-bottom: 20px; text-align: right;">
+                        <button class="refresh-btn" @click="loadData" :disabled="isRefreshing">
+                            <i class="bi bi-arrow-repeat" :class="{'spin': isRefreshing}"></i> 
+                            {{ isRefreshing ? 'Обновление...' : 'Обновить' }}
+                        </button>
+                        <span class="auto-refresh-badge" v-if="pollingInterval">
+                            <i class="bi bi-clock-history"></i> Автообновление каждые 10 сек
+                        </span>
+                    </div>
+                    
+                    <!-- Диаграмма с тремя графиками -->
+                    <div class="chart-container" v-if="chartData.labels.length > 0">
+                        <div class="badge-epoche">
+                            <i class="bi bi-graph-up"></i> Всего эпох: {{ chartData.labels.length }}
+                        </div>
+                        <canvas id="trainingChart"></canvas>
+                        
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #FF6384;"></div>
+                                <span>Точность определения тональности (APC-ACC)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #36A2EB;"></div>
+                                <span>F1 определение тональности (APC-F1)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #FFCE56;"></div>
+                                <span>F1 извлечения аспектов (ATE-F1)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Сводка метрик -->
+                    <div class="metrics-summary" v-if="latestMetrics">
+                        <div class="metric-card">
+                            <h4><i class="bi bi-graph-down"></i> Точность определения тональности</h4>
+                            <div class="value">{{ latestMetrics.apc_acc?.toFixed(4) || '—' }}</div>
+                        </div>
+                        <div class="metric-card">
+                            <h4><i class="bi bi-graph-up"></i> F1 определение тональности</h4>
+                            <div class="value">{{ latestMetrics.apc_f1?.toFixed(4) || '—' }}</div>
+                        </div>
+                        <div class="metric-card">
+                            <h4><i class="bi bi-check-circle"></i> F1 извлечения аспектов</h4>
+                            <div class="value">{{ latestMetrics.ate_f1?.toFixed(4) || '—' }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Таблица с деталями по эпохам -->
+                    <div class="epochs-table" v-if="metricsData.length > 0">
+                        <h5 style="margin-bottom: 15px;"><i class="bi bi-table"></i> Детали по эпохам</h5>
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Эпоха</th>
+                                    <th>Точность определения тональности</th>
+                                    <th>F1 определение тональности</th>
+                                    <th>F1 извлечения аспектов</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="metric in metricsData" :key="metric.epoch">
+                                    <td><strong>{{ metric.epoch || metric.epoch_num || '—' }}</strong></td>
+                                    <td>{{ metric.apc_acc?.toFixed(4) || '—' }}</td>
+                                    <td>{{ metric.apc_f1?.toFixed(4) || '—' }}</td>
+                                    <td>{{ metric.ate_f1?.toFixed(4) || '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="check-auth.js"></script>
+<script>
+
+new Vue({
+    el: '#app',
+    data: {
+        projectId: null,
+        accessToken: null,
+        userLogin: '',
+        isLoading: true,
+        isRefreshing: false,
+        errorMsg: '',
+        metricsData: [],
+        chartInstance: null,
+        pollingInterval: null,
+        chartData: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'APC-ACC',
+                    data: [],
+                    borderColor: '#FF6384',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'APC-F1',
+                    data: [],
+                    borderColor: '#36A2EB',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'ATE-F1',
+                    data: [],
+                    borderColor: '#FFCE56',
+                    backgroundColor: 'rgba(255, 206, 86, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        }
+    },
+    computed: {
+        latestMetrics() {
+            if (this.metricsData.length === 0) return null;
+            return this.metricsData[this.metricsData.length - 1];
+        },
+        trainingNotStarted() {
+            return !this.isLoading && !this.errorMsg && this.metricsData.length === 0;
+        }
+    },
+    mounted() {
+        // Проверка авторизации через check-auth.js
+        const token = checkAuth();
+        
+        if (!token) {
+            return;
+        }
+        
+        // Получаем информацию о пользователе
+        const userInfo = getCurrentUser();
+        if (userInfo && userInfo.login) {
+            this.userLogin = userInfo.login;
+            this.accessToken = token;
+        } else {
+            const accountData = localStorage.getItem('account_info');
+            if (accountData) {
+                try {
+                    const account = JSON.parse(accountData);
+                    this.userLogin = account.login || '';
+                    this.accessToken = account.access_token || '';
+                } catch (e) {
+                    console.error('Error parsing account info:', e);
+                    this.logout();
+                }
+            } else {
+                this.logout();
+            }
+        }
+        
+        // Получаем данные из sessionStorage
+        const savedData = sessionStorage.getItem('modelTrainingDetails');
+        if (!savedData) {
+            this.errorMsg = 'Данные не найдены. Пожалуйста, вернитесь к проекту.';
+            this.isLoading = false;
+            return;
+        }
+        
+        try {
+            const data = JSON.parse(savedData);
+            this.projectId = data.project_id;
+            this.accessToken = data.access_token || this.accessToken;
+        } catch (e) {
+            console.error('Error parsing session data:', e);
+            this.errorMsg = 'Ошибка загрузки данных';
+            this.isLoading = false;
+        }
+        
+        if (this.projectId) {
+            this.loadData();
+            this.startPolling();
+        }
+    },
+    beforeDestroy() {
+        this.stopPolling();
+        if (this.chartInstance) {
+            this.chartInstance.destroy();
+            this.chartInstance = null;
+        }
+    },
+    methods: {
+        async loadData() {
+            if (!this.projectId) return;
+            
+            this.isRefreshing = true;
+            
+            try {
+                // Проверяем валидность токена
+                const token = getAuthToken();
+                if (!token) {
+                    this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                    this.isLoading = false;
+                    this.isRefreshing = false;
+                    setTimeout(() => this.logout(), 2000);
+                    return;
+                }
+                
+                const response = await authFetch(`${API_BASE}/get_train_model_status?project_id=${this.projectId}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'Success' || result.status === 'success') {
+                    this.metricsData = result.data || [];
+                    this.errorMsg = '';
+                    this.updateChart();
+                    this.isLoading = false;
+                } else if (result.status === 'Error') {
+                    this.errorMsg = result.message || 'Ошибка загрузки данных';
+                    this.metricsData = [];
+                    this.isLoading = false;
+                } else {
+                    this.metricsData = [];
+                    this.isLoading = false;
+                }
+                
+            } catch (error) {
+                console.error('Error loading training data:', error);
+                
+                if (error.message === 'Session expired' || error.message === 'No auth token') {
+                    this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                    setTimeout(() => this.logout(), 2000);
+                } else if (error.message.includes('Failed to fetch')) {
+                    this.errorMsg = 'Не удалось подключиться к серверу. Проверьте, запущен ли backend.';
+                } else {
+                    this.errorMsg = `Ошибка: ${error.message}`;
+                }
+                this.isLoading = false;
+            } finally {
+                this.isRefreshing = false;
+            }
+        },
+        
+        startPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+            }
+            // Проверяем, идет ли еще обучение (если последняя эпоха не завершена или обучение активно)
+            this.pollingInterval = setInterval(() => {
+                // Проверяем, нужно ли продолжать обновление
+                const isTrainingActive = this.checkTrainingActive();
+                if (isTrainingActive) {
+                    this.loadData();
+                }
+            }, 10000); // Обновляем каждые 10 секунд
+        },
+        
+        stopPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+        },
+        
+        checkTrainingActive() {
+            // Если нет данных или последняя запись не показывает завершение обучения
+            if (this.metricsData.length === 0) return true;
+            // Можно добавить логику проверки, завершено ли обучение
+            // Например, если есть поле is_complete в данных
+            return true;
+        },
+        
+        updateChart() {
+            // Очищаем существующие данные
+            this.chartData.labels = [];
+            this.chartData.datasets[0].data = [];
+            this.chartData.datasets[1].data = [];
+            this.chartData.datasets[2].data = [];
+            
+            // Заполняем данные из метрик
+            this.metricsData.forEach((metric, index) => {
+                const epochNum = metric.epoch || metric.epoch_num || (index + 1);
+                this.chartData.labels.push(`Эпоха ${epochNum}`);
+                this.chartData.datasets[0].data.push(metric.apc_acc !== undefined ? metric.apc_acc : 0);
+                this.chartData.datasets[1].data.push(metric.apc_f1 !== undefined ? metric.apc_f1 : 0);
+                this.chartData.datasets[2].data.push(metric.ate_f1 !== undefined ? metric.ate_f1 : 0);
+            });
+            
+            // Перерисовываем график
+            this.$nextTick(() => {
+                this.renderChart();
+            });
+        },
+        
+        renderChart() {
+            const canvas = document.getElementById('trainingChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (this.chartInstance) {
+                this.chartInstance.destroy();
+                this.chartInstance = null;
+            }
+            
+            if (this.chartData.labels.length === 0) return;
+            
+            this.chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: this.chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 10
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    let value = context.raw;
+                                    return `${label}: ${(value * 100).toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            min: 0,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Значение метрики',
+                                color: '#666'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100).toFixed(0) + '%';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Эпохи',
+                                color: '#666'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        },
+        
+        goBack() {
+            this.stopPolling();
+            if (this.projectId) {
+                window.location.href = `Project.html?id=${this.projectId}`;
+            } else {
+                window.location.href = 'Projects.html';
+            }
+        },
+        
+        logout() {
+            this.stopPolling();
+            localStorage.removeItem('account_info');
+            sessionStorage.removeItem('modelTrainingDetails');
+            window.location.href = '../Account/Login.html';
+        }
+    }
+});
+</script>
+</body>
+</html>

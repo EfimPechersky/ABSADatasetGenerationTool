@@ -6,18 +6,29 @@ from DatasetModels.AspectModel import Aspect
 from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
-from Storage.Process_statuses import ProcessStatuses
+from Storage.DatabaseManager import DatabaseManager
 """Класс, отвечающий за генерацию при помощи метода комбинации"""
 class CombinationGenerator:
     combinations_dataset:Dataset
     model:LLM
-    __PS:ProcessStatuses
+    DBManager:DatabaseManager
     """Конструктор"""
-    def __init__(self, code):
+    def __init__(self, project_id):
         self.combinations_dataset=Dataset()
         self.model=LLM()
-        self.__PS=ProcessStatuses()
-        self.__code=code
+        self.DBManager=DatabaseManager()
+        self.__project_id=project_id
+
+
+    def __change_progress(self, progress, status_id=2):
+        if status_id==None:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation",2, progress)
+        else:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation", status_id, progress)
+    
+    def __get_progress(self):
+        res=self.DBManager.get_operation_info(self.__project_id, "Dataset generation")
+        return res["progress"]
 
     """Преобразование ответа из xml в json"""
     def from_xml(xml):
@@ -43,8 +54,8 @@ class CombinationGenerator:
                 messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
                 res=self.model.send_prompt(messages)
                 samples+=[res]
-                progress=self.__PS.get_dataset_generation_progress(self.__code)["progress"]+0.5/((len(dataset.samples)*len(dataset.samples)/2))
-                self.__PS.change_dataset_generation_progress(self.__code,"In progress", progress)
+                progress=self.__get_progress()+0.5/((len(dataset.samples)*len(dataset.samples)/2))
+                self.__change_progress(progress)
         json_data={"samples":[]}
         for i in samples:
             try:

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <!-- Подключаем библиотеку для хеширования -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .register-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input.error {
+            border-color: #f44336;
+        }
+
+        .error-text {
+            color: #f44336;
+            font-size: 12px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .password-strength {
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .strength-bar {
+            height: 3px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .strength-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h1>Регистрация</h1>
+        <form id="registerForm">
+            <div class="form-group">
+                <label>Логин</label>
+                <input type="text" id="login" name="login" required autocomplete="username">
+                <span class="error-text" id="loginError"></span>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="email" name="email" required autocomplete="email">
+                <span class="error-text" id="emailError"></span>
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="password" name="password" required autocomplete="new-password">
+                <div class="password-strength">
+                    <span class="error-text" id="passwordError"></span>
+                    <div class="strength-bar">
+                        <div class="strength-fill" id="strengthFill"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Подтверждение пароля</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required autocomplete="off">
+                <span class="error-text" id="confirmError"></span>
+            </div>
+            <button type="submit" id="submitBtn">Зарегистрироваться</button>
+        </form>
+        <div id="message" class="message"></div>
+        <div class="login-link">
+            Уже есть аккаунт? <a href="Login.html">Войти</a>
+        </div>
+    </div>
+
+    <script src="check-auth.js"></script>
+    <script>
+        // Функция для хеширования пароля (SHA-256)
+        async function hashPassword(password) {
+            // Используем CryptoJS для SHA-256
+            const hashed = CryptoJS.SHA256(password).toString();
+            return hashed;
+        }
+        
+        // Функция для проверки сложности пароля
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/\d/)) strength++;
+            if (password.match(/[^a-zA-Z\d]/)) strength++;
+            
+            const strengthFill = document.getElementById('strengthFill');
+            const width = (strength / 4) * 100;
+            strengthFill.style.width = `${width}%`;
+            
+            if (strength <= 1) {
+                strengthFill.style.backgroundColor = '#ff4444';
+            } else if (strength <= 2) {
+                strengthFill.style.backgroundColor = '#ffa500';
+            } else if (strength <= 3) {
+                strengthFill.style.backgroundColor = '#ffeb3b';
+            } else {
+                strengthFill.style.backgroundColor = '#00c851';
+            }
+            
+            return strength;
+        }
+
+        // Очистка ошибок при вводе
+        document.getElementById('login').addEventListener('input', () => {
+            document.getElementById('login').classList.remove('error');
+            document.getElementById('loginError').textContent = '';
+        });
+        
+        document.getElementById('email').addEventListener('input', () => {
+            document.getElementById('email').classList.remove('error');
+            document.getElementById('emailError').textContent = '';
+        });
+        
+        document.getElementById('password').addEventListener('input', () => {
+            document.getElementById('password').classList.remove('error');
+            document.getElementById('passwordError').textContent = '';
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+            
+            const password = document.getElementById('password').value;
+            if (password.length > 0) {
+                checkPasswordStrength(password);
+                if (password.length < 6) {
+                    document.getElementById('passwordError').textContent = 'Пароль должен быть не менее 6 символов';
+                }
+            }
+        });
+        
+        document.getElementById('confirmPassword').addEventListener('input', () => {
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const login = document.getElementById('login').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const submitBtn = document.getElementById('submitBtn');
+            
+            // Очищаем предыдущие ошибки
+            let isValid = true;
+            
+            document.getElementById('login').classList.remove('error');
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('email').classList.remove('error');
+            document.getElementById('emailError').textContent = '';
+            document.getElementById('password').classList.remove('error');
+            document.getElementById('passwordError').textContent = '';
+            document.getElementById('confirmPassword').classList.remove('error');
+            document.getElementById('confirmError').textContent = '';
+            
+            // Валидация логина
+            if (!login) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Введите логин';
+                isValid = false;
+            } else if (login.length < 3) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Логин должен быть не менее 3 символов';
+                isValid = false;
+            } else if (login.length > 50) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Логин должен быть не более 50 символов';
+                isValid = false;
+            } else if (!/^[a-zA-Z0-9_]+$/.test(login)) {
+                document.getElementById('login').classList.add('error');
+                document.getElementById('loginError').textContent = 'Логин может содержать только буквы, цифры и подчеркивание';
+                isValid = false;
+            }
+            
+            // Валидация email
+            if (!email) {
+                document.getElementById('email').classList.add('error');
+                document.getElementById('emailError').textContent = 'Введите email';
+                isValid = false;
+            } else if (!/^[^\s@]+@([^\s@]+\.)+[^\s@]+$/.test(email)) {
+                document.getElementById('email').classList.add('error');
+                document.getElementById('emailError').textContent = 'Введите корректный email';
+                isValid = false;
+            }
+            
+            // Валидация пароля
+            if (!password) {
+                document.getElementById('password').classList.add('error');
+                document.getElementById('passwordError').textContent = 'Введите пароль';
+                isValid = false;
+            } else if (password.length < 6) {
+                document.getElementById('password').classList.add('error');
+                document.getElementById('passwordError').textContent = 'Пароль должен быть не менее 6 символов';
+                isValid = false;
+            }
+            
+            // Валидация подтверждения пароля
+            if (!confirmPassword) {
+                document.getElementById('confirmPassword').classList.add('error');
+                document.getElementById('confirmError').textContent = 'Подтвердите пароль';
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                document.getElementById('confirmPassword').classList.add('error');
+                document.getElementById('confirmError').textContent = 'Пароли не совпадают';
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Регистрация...';
+            
+            try {
+                // Хешируем пароль перед отправкой
+                const hashedPassword = await hashPassword(password);
+                console.log('Пароль захэширован:', hashedPassword.substring(0, 20) + '...');
+                
+                const response = await fetch(`${API_BASE}/create_user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        login, 
+                        email, 
+                        password: hashedPassword  // Отправляем хеш вместо plain password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'Success') {
+                    // Автоматический вход после регистрации
+                    try {
+                        // Для входа也需要 хешировать пароль
+                        const hashedPasswordForLogin = await hashPassword(password);
+                        
+                        const loginResponse = await fetch(`${API_BASE}/login`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ 
+                                login, 
+                                password: hashedPasswordForLogin 
+                            })
+                        });
+                        
+                        const loginData = await loginResponse.json();
+                        
+                        if (loginData.status === 'Success') {
+                            const decodedToken = parseJWT(loginData.message);
+                            const account_info = {
+                                "access_token": loginData.message,
+                                "login": login,
+                                "email": email,
+                                "expires_at": decodedToken?.exp,
+                                "user_id": decodedToken?.sub
+                            };
+                            
+                            localStorage.setItem('account_info', JSON.stringify(account_info));
+                            showMessage('Регистрация успешна! Выполняется вход...', 'success');
+                            setTimeout(() => {
+                                window.location.href = '../Projects/Projects.html';
+                            }, 1500);
+                        } else {
+                            showMessage('Регистрация успешна! Теперь вы можете войти.', 'success');
+                            setTimeout(() => {
+                                window.location.href = 'Login.html';
+                            }, 2000);
+                        }
+                    } catch (loginError) {
+                        console.error('Auto-login error:', loginError);
+                        showMessage('Регистрация успешна! Теперь вы можете войти.', 'success');
+                        setTimeout(() => {
+                            window.location.href = 'Login.html';
+                        }, 2000);
+                    }
+                } else {
+                    showMessage(data.message || 'Ошибка регистрации', 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                
+                if (error.message.includes('Failed to fetch')) {
+                    showMessage('❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.', 'error');
+                } else if (error.message.includes('401') || error.message.includes('403')) {
+                    showMessage('Ошибка авторизации. Пожалуйста, попробуйте позже.', 'error');
+                } else {
+                    showMessage('Ошибка соединения с сервером: ' + error.message, 'error');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Зарегистрироваться';
+            }
+        });
+        
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Валидация email при потере фокуса
+        document.getElementById('email').addEventListener('blur', () => {
+            const email = document.getElementById('email').value.trim();
+            if (email && !/^[^\s@]+@([^\s@]+\.)+[^\s@]+$/.test(email)) {
+                document.getElementById('email').classList.add('error');
+                document.getElementById('emailError').textContent = 'Введите корректный email';
+            }
+        });
+        
+        // Проверка совпадения паролей в реальном времени
+        document.getElementById('confirmPassword').addEventListener('input', () => {
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            
+            if (confirm && password !== confirm) {
+                document.getElementById('confirmPassword').classList.add('error');
+                document.getElementById('confirmError').textContent = 'Пароли не совпадают';
+            } else {
+                document.getElementById('confirmPassword').classList.remove('error');
+                document.getElementById('confirmError').textContent = '';
+            }
+        });
+    </script>
+</body>
+</html>

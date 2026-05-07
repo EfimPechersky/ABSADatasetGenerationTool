@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аспектный анализ дашборд</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #667eea;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
+        .back-btn:hover {
+            background: #f0f0f0;
+            transform: translateX(-3px);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-login {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        .sentiment-control {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .sentiment-label {
+            font-weight: 600;
+            margin-right: 15px;
+            color: #555;
+        }
+
+        .sentiment-buttons {
+            display: inline-flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .sentiment-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .sentiment-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .sentiment-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .full-width-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .full-width-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #333;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+        }
+
+        .full-width-chart {
+            width: 100%;
+            height: 500px;
+        }
+
+        .stats-footer {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            text-align: center;
+        }
+
+        .stat-card {
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 60px;
+            background: white;
+            border-radius: 15px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .sentiment-btn {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .header-left {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <button class="back-btn" id="backBtn">← Назад к проекту</button>
+                <h1>📊 Аспектный анализ дашборд</h1>
+            </div>
+            <div class="user-info">
+                <span class="user-login" id="userLogin"></span>
+                <button class="logout-btn" id="logoutBtn">Выйти</button>
+            </div>
+        </div>
+        
+        <div id="content">
+            <!-- Содержимое будет загружено динамически -->
+        </div>
+    </div>
+
+    <script src="check-auth.js"></script>
+    <script>
+        let groupedBarChart, pieChart, simpleBarChart;
+        let currentSentiment = 'all';
+        let projectId = null;
+        let accessToken = null;
+        let fullData = null;
+        let resizeObserver = null;
+
+        // Проверка авторизации и инициализация
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Проверяем токен через check-auth.js
+            const token = checkAuth();
+            
+            if (!token) {
+                return;
+            }
+            
+            // Получаем информацию о пользователе
+            const userInfo = getCurrentUser();
+            if (userInfo && userInfo.login) {
+                document.getElementById('userLogin').textContent = `👤 ${userInfo.login}`;
+                accessToken = token;
+            } else {
+                const accountData = localStorage.getItem('account_info');
+                if (accountData) {
+                    try {
+                        const account = JSON.parse(accountData);
+                        document.getElementById('userLogin').textContent = account.login || '';
+                        accessToken = account.access_token || '';
+                    } catch (e) {
+                        console.error('Error parsing account info:', e);
+                        logout();
+                    }
+                } else {
+                    logout();
+                }
+            }
+            
+            // Получаем данные из sessionStorage
+            const savedData = sessionStorage.getItem('dashboardData');
+            if (!savedData) {
+                showError('Данные не найдены. Пожалуйста, вернитесь к проекту.');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(savedData);
+                projectId = data.project_id;
+                accessToken = data.access_token || accessToken;
+                
+                // Настраиваем обработчики кнопок
+                document.getElementById('backBtn').onclick = goBackToProject;
+                document.getElementById('logoutBtn').onclick = logout;
+                
+                await loadDashboard();
+            } catch (e) {
+                console.error('Error parsing session data:', e);
+                showError('Ошибка загрузки данных дашборда');
+            }
+        });
+        
+        async function loadDashboard() {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = `
+                <div class="loader">
+                    <div class="spinner"></div>
+                    <p>Загрузка данных дашборда...</p>
+                </div>
+            `;
+            
+            try {
+                // Проверяем валидность токена
+                const token = getAuthToken();
+                if (!token) {
+                    showError('Сессия истекла. Пожалуйста, войдите снова.');
+                    setTimeout(() => logout(), 2000);
+                    return;
+                }
+                
+                // Проверяем, завершен ли анализ отзывов
+                const checkResponse = await authFetch(`${API_BASE}/project?project_id=${projectId}`, {
+                    method: 'GET'
+                });
+                
+                const projectData = await checkResponse.json();
+                const reviewAnalysisOp = projectData.operations_info?.find(op => op.type === 'Review analysis');
+                
+                if (!reviewAnalysisOp || reviewAnalysisOp.status !== 'Done') {
+                    contentDiv.innerHTML = `
+                        <div class="info-message">
+                            <i class="bi bi-info-circle"></i> 
+                            Анализ отзывов еще не завершен. Пожалуйста, дождитесь завершения операции.
+                            <br><br>
+                            <button class="back-btn" onclick="goBackToProject()" style="margin-top: 15px;">← Вернуться к проекту</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Загружаем полные данные для группированной гистограммы
+                await loadFullData();
+                
+                // Загружаем и отображаем дашборд
+                await renderDashboardAndLoadData();
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                
+                if (error.message === 'Session expired' || error.message === 'No auth token') {
+                    showError('Сессия истекла. Пожалуйста, войдите снова.');
+                    setTimeout(() => logout(), 2000);
+                } else if (error.message.includes('Failed to fetch')) {
+                    showError('Не удалось подключиться к серверу. Проверьте, запущен ли backend.');
+                } else {
+                    showError('Ошибка загрузки данных: ' + error.message);
+                }
+            }
+        }
+        
+        async function loadFullData() {
+            try {
+                const response = await authFetch(`${API_BASE}/chart-data?project_id=${projectId}&sentiment=all`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'Success' || result.status === 'success') {
+                    fullData = result.data;
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки полных данных:', error);
+            }
+        }
+        
+        async function renderDashboardAndLoadData() {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = `
+
+                <!-- Группированная гистограмма (на всю ширину) -->
+                <div class="full-width-card">
+                    <div class="chart-title">
+                        📊 Распределение аспектов по категориям и тональностям
+                    </div>
+                    <div id="grouped-bar-chart" class="full-width-chart"></div>
+                </div>
+
+                <div class="sentiment-control">
+                    <span class="sentiment-label">Выберите тональность:</span>
+                    <div class="sentiment-buttons">
+                        <button class="sentiment-btn active" data-sentiment="all">🎯 Все тональности</button>
+                        <button class="sentiment-btn" data-sentiment="positive">😊 Позитивные</button>
+                        <button class="sentiment-btn" data-sentiment="negative">😞 Негативные</button>
+                        <button class="sentiment-btn" data-sentiment="neutral">😐 Нейтральные</button>
+                    </div>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">
+                            📊 Количество аспектов по категориям
+                        </div>
+                        <div id="bar-chart" class="chart-container"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title">
+                            🥧 Распределение аспектов по категориям
+                        </div>
+                        <div id="pie-chart" class="chart-container"></div>
+                    </div>
+                </div>
+
+                <div class="stats-footer">
+                    <div class="stats-grid" id="stats-container"></div>
+                </div>
+            `;
+            
+            // Инициализируем диаграммы
+            const groupedChartElement = document.getElementById('grouped-bar-chart');
+            const barChartElement = document.getElementById('bar-chart');
+            const pieChartElement = document.getElementById('pie-chart');
+            
+            if (groupedChartElement) {
+                groupedBarChart = echarts.init(groupedChartElement);
+            }
+            if (barChartElement) {
+                simpleBarChart = echarts.init(barChartElement);
+            }
+            if (pieChartElement) {
+                pieChart = echarts.init(pieChartElement);
+            }
+            
+            // Отображаем группированную гистограмму с полными данными
+            if (fullData && groupedBarChart) {
+                updateGroupedBarChart(fullData);
+            }
+            
+            // Загружаем начальные данные для простой гистограммы и круговой диаграммы
+            await loadChartData('all');
+            
+            // Добавляем обработчики для кнопок
+            const buttons = document.querySelectorAll('.sentiment-btn');
+            buttons.forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    const sentiment = button.getAttribute('data-sentiment');
+                    currentSentiment = sentiment;
+                    await loadChartData(sentiment);
+                });
+            });
+            
+            // Адаптация под изменение размера окна
+            const handleResize = () => {
+                if (groupedBarChart) groupedBarChart.resize();
+                if (simpleBarChart) simpleBarChart.resize();
+                if (pieChart) pieChart.resize();
+            };
+            
+            window.addEventListener('resize', handleResize);
+            
+            // Сохраняем для cleanup
+            window.dashboardResizeHandler = handleResize;
+        }
+        
+        // Группированная гистограмма с тремя столбцами для каждой категории
+        function updateGroupedBarChart(data) {
+            if (!groupedBarChart) return;
+            
+            const categories = data.map(item => item.category);
+            const positiveValues = data.map(item => item.positive);
+            const negativeValues = data.map(item => item.negative);
+            const neutralValues = data.map(item => item.neutral);
+            
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = `${params[0].axisValue}<br/>`;
+                        for (let i = 0; i < params.length; i++) {
+                            const color = params[i].color;
+                            const marker = `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${color};"></span>`;
+                            result += `${marker} ${params[i].seriesName}: ${params[i].value}<br/>`;
+                        }
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ['Позитивные', 'Негативные', 'Нейтральные'],
+                    left: 'center',
+                    top: 0,
+                    itemWidth: 30,
+                    textStyle: {
+                        color: '#333'
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: categories,
+                    axisLabel: {
+                        rotate: categories.length > 6 ? 45 : 0,
+                        interval: 0,
+                        fontSize: 11,
+                        fontWeight: 'bold'
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: '#667eea'
+                        }
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Количество аспектов',
+                    nameLocation: 'middle',
+                    nameGap: 50,
+                    axisLabel: {
+                        fontSize: 12
+                    }
+                },
+                series: [
+                    {
+                        name: 'Позитивные',
+                        type: 'bar',
+                        data: positiveValues,
+                        itemStyle: {
+                            color: '#4caf50',
+                            borderRadius: [5, 5, 0, 0],
+                            shadowColor: 'rgba(76, 175, 80, 0.3)',
+                            shadowBlur: 10
+                        },
+                        label: {
+                            show: true,
+                            position: 'top',
+                            fontWeight: 'bold',
+                            formatter: '{c}'
+                        },
+                        barWidth: '25%'
+                    },
+                    {
+                        name: 'Негативные',
+                        type: 'bar',
+                        data: negativeValues,
+                        itemStyle: {
+                            color: '#f44336',
+                            borderRadius: [5, 5, 0, 0],
+                            shadowColor: 'rgba(244, 67, 54, 0.3)',
+                            shadowBlur: 10
+                        },
+                        label: {
+                            show: true,
+                            position: 'top',
+                            fontWeight: 'bold',
+                            formatter: '{c}'
+                        },
+                        barWidth: '25%'
+                    },
+                    {
+                        name: 'Нейтральные',
+                        type: 'bar',
+                        data: neutralValues,
+                        itemStyle: {
+                            color: '#ff9800',
+                            borderRadius: [5, 5, 0, 0],
+                            shadowColor: 'rgba(255, 152, 0, 0.3)',
+                            shadowBlur: 10
+                        },
+                        label: {
+                            show: true,
+                            position: 'top',
+                            fontWeight: 'bold',
+                            formatter: '{c}'
+                        },
+                        barWidth: '25%'
+                    }
+                ],
+                animation: true,
+                animationDuration: 1000,
+                animationEasing: 'cubicOut'
+            };
+            
+            groupedBarChart.setOption(option, true);
+        }
+        
+        async function loadChartData(sentiment) {
+            try {
+                // Проверяем валидность токена
+                const token = getAuthToken();
+                if (!token) {
+                    showError('Сессия истекла. Пожалуйста, войдите снова.');
+                    setTimeout(() => logout(), 2000);
+                    return;
+                }
+                
+                document.body.style.cursor = 'wait';
+                
+                const response = await authFetch(`${API_BASE}/chart-data?project_id=${projectId}&sentiment=${sentiment}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'Success' || result.status === 'success') {
+                    const categories = result.data.map(item => item.category);
+                    const values = result.data.map(item => item.value);
+                    
+                    if (simpleBarChart) {
+                        updateSimpleBarChart(categories, values, sentiment);
+                    }
+                    if (pieChart) {
+                        updatePieChart(categories, values);
+                    }
+                    updateStats(result.data);
+                } else {
+                    console.error('Error loading chart data:', result.message);
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                
+                if (error.message === 'Session expired') {
+                    showError('Сессия истекла. Пожалуйста, войдите снова.');
+                    setTimeout(() => logout(), 2000);
+                }
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        }
+        
+        function updateSimpleBarChart(categories, values, sentiment) {
+            if (!simpleBarChart) return;
+            
+            const sentimentLabels = {
+                'positive': 'Позитивные аспекты',
+                'negative': 'Негативные аспекты',
+                'neutral': 'Нейтральные аспекты',
+                'all': 'Все аспекты'
+            };
+            
+            const colors = {
+                'positive': '#4caf50',
+                'negative': '#f44336',
+                'neutral': '#ff9800',
+                'all': '#667eea'
+            };
+            
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        return `${params[0].name}<br/>Количество: ${params[0].value}`;
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: categories,
+                    axisLabel: {
+                        rotate: categories.length > 6 ? 45 : 0,
+                        interval: 0,
+                        fontSize: 11
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Количество аспектов'
+                },
+                series: [{
+                    name: sentimentLabels[sentiment],
+                    type: 'bar',
+                    data: values,
+                    itemStyle: {
+                        color: colors[sentiment],
+                        borderRadius: [5, 5, 0, 0],
+                        shadowColor: 'rgba(102, 126, 234, 0.3)',
+                        shadowBlur: 10
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        fontWeight: 'bold'
+                    },
+                    animation: true,
+                    animationDuration: 1000,
+                    animationEasing: 'cubicOut'
+                }]
+            };
+            
+            simpleBarChart.setOption(option, true);
+        }
+        
+        function updatePieChart(categories, values) {
+            if (!pieChart) return;
+            
+            // Фильтруем категории с нулевыми значениями для круговой диаграммы
+            const nonZeroIndices = values.reduce((indices, value, idx) => {
+                if (value > 0) indices.push(idx);
+                return indices;
+            }, []);
+            
+            const nonZeroCategories = nonZeroIndices.map(i => categories[i]);
+            const nonZeroValues = nonZeroIndices.map(i => values[i]);
+            
+            // Если нет данных для отображения
+            if (nonZeroCategories.length === 0) {
+                pieChart.setOption({
+                    title: {
+                        show: true,
+                        text: 'Нет данных для отображения',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: { color: '#999', fontSize: 14 }
+                    }
+                }, true);
+                return;
+            }
+            
+            // Генерируем цвета
+            const colors = nonZeroCategories.map((_, index) => {
+                const hue = (index * 360 / Math.max(nonZeroCategories.length, 1)) % 360;
+                return `hsl(${hue}, 70%, 60%)`;
+            });
+            
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}: {d}% ({c})'
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                    type: 'scroll',
+                    pageIconColor: '#667eea',
+                    formatter: function(name) {
+                        return name.length > 20 ? name.substring(0, 18) + '...' : name;
+                    }
+                },
+                series: [{
+                    name: 'Распределение',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        formatter: '{b}: {d}%',
+                        fontWeight: 'bold'
+                    },
+                    emphasis: {
+                        scale: true,
+                        label: {
+                            show: true,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    data: nonZeroCategories.map((name, index) => ({
+                        name: name,
+                        value: nonZeroValues[index],
+                        itemStyle: { color: colors[index] }
+                    })),
+                    animation: true,
+                    animationDuration: 1000,
+                    animationEasing: 'cubicOut'
+                }]
+            };
+            
+            pieChart.setOption(option, true);
+        }
+        
+        function updateStats(data) {
+            const totalAspects = data.reduce((sum, item) => sum + item.value, 0);
+            const avgPerCategory = data.length > 0 ? (totalAspects / data.length).toFixed(1) : 0;
+            const maxCategory = data.length > 0 ? data.reduce((max, item) => item.value > max.value ? item : max, data[0]) : { category: '-', value: 0 };
+            const minCategory = data.length > 0 ? data.reduce((min, item) => item.value < min.value ? item : min, data[0]) : { category: '-', value: 0 };
+            
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalAspects}</div>
+                    <div class="stat-label">Всего аспектов</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgPerCategory}</div>
+                    <div class="stat-label">Среднее на категорию</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${escapeHtml(maxCategory.category)}</div>
+                    <div class="stat-label">Максимум (${maxCategory.value})</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${escapeHtml(minCategory.category)}</div>
+                    <div class="stat-label">Минимум (${minCategory.value})</div>
+                </div>
+            `;
+            
+            const statsContainer = document.getElementById('stats-container');
+            if (statsContainer) {
+                statsContainer.innerHTML = statsHtml;
+            }
+        }
+        
+        function showError(message) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = `
+                <div class="error-message">
+                    ❌ ${escapeHtml(message)}
+                    <br><br>
+                    <button class="back-btn" onclick="goBackToProject()" style="margin-top: 15px;">← Вернуться к проекту</button>
+                </div>
+            `;
+        }
+        
+        function goBackToProject() {
+            // Очищаем обработчики
+            if (window.dashboardResizeHandler) {
+                window.removeEventListener('resize', window.dashboardResizeHandler);
+            }
+            
+            // Уничтожаем диаграммы
+            if (groupedBarChart) {
+                groupedBarChart.dispose();
+                groupedBarChart = null;
+            }
+            if (simpleBarChart) {
+                simpleBarChart.dispose();
+                simpleBarChart = null;
+            }
+            if (pieChart) {
+                pieChart.dispose();
+                pieChart = null;
+            }
+            
+            if (projectId) {
+                window.location.href = `Project.html?id=${projectId}`;
+            } else {
+                window.location.href = 'Projects.html';
+            }
+        }
+        
+        function logout() {
+            // Очищаем обработчики
+            if (window.dashboardResizeHandler) {
+                window.removeEventListener('resize', window.dashboardResizeHandler);
+            }
+            
+            // Уничтожаем диаграммы
+            if (groupedBarChart) {
+                groupedBarChart.dispose();
+            }
+            if (simpleBarChart) {
+                simpleBarChart.dispose();
+            }
+            if (pieChart) {
+                pieChart.dispose();
+            }
+            
+            localStorage.removeItem('account_info');
+            sessionStorage.removeItem('dashboardData');
+            window.location.href = '../Account/Login.html';
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+        
+        // Cleanup перед уходом со страницы
+        window.addEventListener('beforeunload', () => {
+            if (groupedBarChart) groupedBarChart.dispose();
+            if (simpleBarChart) simpleBarChart.dispose();
+            if (pieChart) pieChart.dispose();
+            if (window.dashboardResizeHandler) {
+                window.removeEventListener('resize', window.dashboardResizeHandler);
+            }
+        });
+    </script>
+</body>
+</html>

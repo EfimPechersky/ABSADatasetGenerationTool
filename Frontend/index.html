@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Перенаправление...</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .loader {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-width: 300px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            color: #333;
+            font-size: 14px;
+        }
+        .error {
+            color: red;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .info {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="loader">
+        <div class="spinner"></div>
+        <div class="message" id="message">Проверка авторизации...</div>
+        <div id="errorMessage" class="error"></div>
+        <div id="info" class="info"></div>
+        <button id="manualLoginBtn" style="display: none;">Перейти на страницу входа</button>
+        <button id="manualProjectsBtn" style="display: none;">Перейти на страницу проектов</button>
+    </div>
+
+    <script>
+        // Настройки
+        const API_BASE = 'http://127.0.0.1:8000';
+        
+        // Функция для декодирования JWT
+        function parseJWT(token) {
+            if (!token) return null;
+            
+            try {
+                const base64Url = token.split('.')[1];
+                if (!base64Url) return null;
+                
+                let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                
+                while (base64.length % 4) {
+                    base64 += '=';
+                }
+                
+                const decodedStr = atob(base64);
+                const jsonString = decodeURIComponent(decodedStr.split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                return JSON.parse(jsonString);
+            } catch (error) {
+                console.error('Ошибка парсинга JWT:', error);
+                return null;
+            }
+        }
+        
+        // Проверка валидности токена
+        function isTokenValid(token) {
+            if (!token) return false;
+            
+            try {
+                const payload = parseJWT(token);
+                if (!payload || !payload.exp) return false;
+                
+                const currentTime = Math.floor(Date.now() / 1000);
+                return payload.exp > currentTime;
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // Получение токена
+        function getToken() {
+            try {
+                const accountInfoStr = localStorage.getItem('account_info');
+                if (accountInfoStr) {
+                    const accountInfo = JSON.parse(accountInfoStr);
+                    return accountInfo.access_token || null;
+                }
+            } catch (e) {
+                console.error('Ошибка получения токена:', e);
+            }
+            return null;
+        }
+        
+        // Получение логина пользователя
+        function getUserLogin() {
+            try {
+                const accountInfoStr = localStorage.getItem('account_info');
+                if (accountInfoStr) {
+                    const accountInfo = JSON.parse(accountInfoStr);
+                    return accountInfo.login || null;
+                }
+            } catch (e) {
+                console.error('Ошибка получения логина:', e);
+            }
+            return null;
+        }
+        
+        // Очистка данных
+        function clearAuthData() {
+            localStorage.removeItem('account_info');
+            localStorage.removeItem('access_token');
+            const messageDiv = document.getElementById('message');
+            if (messageDiv) messageDiv.textContent = 'Данные авторизации очищены';
+        }
+        
+        // Обновление информации на странице
+        function updateInfo(text) {
+            const infoDiv = document.getElementById('info');
+            if (infoDiv) infoDiv.innerHTML = text;
+            console.log(text);
+        }
+        
+        // Основная функция проверки
+        async function checkAuthAndRedirect() {
+            const messageDiv = document.getElementById('message');
+            const errorDiv = document.getElementById('errorMessage');
+            const manualLoginBtn = document.getElementById('manualLoginBtn');
+            const manualProjectsBtn = document.getElementById('manualProjectsBtn');
+            
+            // Показываем информацию о текущем состоянии
+            const token = getToken();
+            const userLogin = getUserLogin();
+            
+            updateInfo(`Токен: ${token ? 'есть (' + token.substring(0, 50) + '...)' : 'нет'}<br>Пользователь: ${userLogin || 'не авторизован'}`);
+            
+            // Если нет токена
+            if (!token) {
+                messageDiv.textContent = 'Токен не найден. Перенаправление на страницу входа...';
+                updateInfo('Токен отсутствует в localStorage');
+                setTimeout(() => {
+                    window.location.href = 'Account/Login.html';
+                }, 1500);
+                return;
+            }
+            
+            // Проверяем валидность токена локально
+            const valid = isTokenValid(token);
+            updateInfo(`Локальная проверка токена: ${valid ? 'валиден' : 'невалиден'}`);
+            
+            if (!valid) {
+                messageDiv.textContent = 'Токен истек или невалиден. Очистка и перенаправление...';
+                clearAuthData();
+                setTimeout(() => {
+                    window.location.href = 'Account/Login.html';
+                }, 1500);
+                return;
+            }
+            
+            // Токен локально валиден, пробуем проверить через API
+            messageDiv.textContent = 'Токен найден, проверка на сервере...';
+            updateInfo('Отправка запроса к API для проверки...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/projects`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                updateInfo(`Ответ сервера: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateInfo(`API ответ: ${data.status || 'OK'}`);
+                    
+                    if (data.status === 'Success') {
+                        messageDiv.textContent = `Добро пожаловать, ${userLogin}! Перенаправление...`;
+                        updateInfo('Авторизация подтверждена, перенаправление на проекты');
+                        setTimeout(() => {
+                            window.location.href = 'Projects/Projects.html';
+                        }, 1000);
+                        return;
+                    }
+                }
+                
+                // Если ответ не OK или статус не Success
+                if (response.status === 401) {
+                    messageDiv.textContent = 'Сессия истекла. Перенаправление на страницу входа...';
+                    updateInfo('Сервер вернул 401 - токен недействителен');
+                    clearAuthData();
+                    setTimeout(() => {
+                        window.location.href = 'Account/Login.html';
+                    }, 1500);
+                    return;
+                }
+                
+                // Другая ошибка
+                throw new Error(`HTTP ${response.status}`);
+                
+            } catch (error) {
+                console.error('Ошибка API:', error);
+                updateInfo(`Ошибка API: ${error.message}`);
+                
+                // Если API недоступен, но токен локально валиден - пропускаем (для разработки)
+                messageDiv.textContent = 'Сервер недоступен, но токен валиден. Попробуем зайти...';
+                updateInfo('⚠️ Сервер API недоступен, но токен локально валиден. Перенаправление на проекты.');
+                
+                setTimeout(() => {
+                    window.location.href = 'Projects/Projects.html';
+                }, 2000);
+            }
+        }
+        
+        // Функция для ручного выбора
+        function showManualOptions() {
+            const manualLoginBtn = document.getElementById('manualLoginBtn');
+            const manualProjectsBtn = document.getElementById('manualProjectsBtn');
+            const errorDiv = document.getElementById('errorMessage');
+            
+            manualLoginBtn.style.display = 'inline-block';
+            manualProjectsBtn.style.display = 'inline-block';
+            errorDiv.textContent = 'Не удалось автоматически определить авторизацию';
+            
+            manualLoginBtn.onclick = () => {
+                window.location.href = 'Account/Login.html';
+            };
+            
+            manualProjectsBtn.onclick = () => {
+                window.location.href = 'Projects/Projects.html';
+            };
+        }
+        
+        // Запускаем проверку
+        checkAuthAndRedirect().catch(error => {
+            console.error('Критическая ошибка:', error);
+            showManualOptions();
+        });
+    </script>
+</body>
+</html>
