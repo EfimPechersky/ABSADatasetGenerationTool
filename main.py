@@ -640,7 +640,6 @@ async def get_chart_data(request: Request, project_id ,sentiment: str = "all"):
     if not auth_header:
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
-    # Проверяем формат "Bearer <token>"
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization header format")
@@ -660,7 +659,6 @@ async def get_chart_data(request: Request, project_id ,sentiment: str = "all"):
     data=FileManager.load_json(data_path)
     if data==None:
         raise HTTPException(status_code=401, detail="No data!")
-    # Фильтруем данные в зависимости от выбранной тональности
     filtered_data = []
     for item in data:
         if sentiment == "positive":
@@ -669,13 +667,13 @@ async def get_chart_data(request: Request, project_id ,sentiment: str = "all"):
             value = data[item]["negative"]
         elif sentiment == "neutral":
             value = data[item]["neutral"]
-        else:  # all
+        else: 
             value = data[item]["all"]
         
         filtered_data.append({
             "category": item,
             "value": value,
-            # Сохраняем все данные для tooltip'ов
+
             "total": data[item]["all"],
             "positive": data[item]["positive"],
             "negative": data[item]["negative"],
