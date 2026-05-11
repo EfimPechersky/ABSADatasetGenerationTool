@@ -5,7 +5,9 @@ import datetime
 from sqlalchemy import DateTime
 from Storage.Base import Base
 from sqlalchemy import func
+
 class Project(Base):
+    """Model for project info"""
     __tablename__ = 'projects'
     id: Mapped[int] = mapped_column(primary_key=True,  autoincrement=True)
     name: Mapped[str] = mapped_column(String(60))

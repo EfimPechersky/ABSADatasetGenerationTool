@@ -21,12 +21,17 @@ from Storage.DatabaseManager import DatabaseManager
 from unidecode import unidecode
 
 def generate_code():
+    """random number generation
+
+    Returns:
+        int: random number
+    """    
     return random.randrange(1000000000, 10000000000)
 
 DBManager=DatabaseManager()
 # Инициализация сервисов
 model = LLM()
-model.apiurl = "https://21c7-34-124-181-90.ngrok-free.app"
+model.apiurl = "https://bumpy-sheep-notice.loca.lt"
 
 app = FastAPI()
 
@@ -40,15 +45,23 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-SAVE_DIR = "./Datasets/"
+
 NEW_SAVE_DIR = "./ProjectsStorage/"
 
-SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2024"  # В продакшене храните в .env
+SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2024"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
-    """Создание JWT токена"""
+    """Create JWT token
+
+    Args:
+        data (dict)
+        expires_delta (timedelta): Defaults to None.
+
+    Returns:
+        str: encoded jwt
+    """    
     to_encode = data.copy()
     
     if expires_delta:
@@ -61,7 +74,14 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 def verify_token(token: str):
-    """Проверка JWT токена"""
+    """token verification
+
+    Args:
+        token (str): JWT token
+
+    Returns:
+        dict: verification result
+    """    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -72,49 +92,61 @@ def verify_token(token: str):
 
 @app.options("/*")
 async def options_save_reviews():
-    return {}
+    """Endpoint for CORS
 
-"""Метод-прототип для генерации примеров"""
-@app.post("/test_generate_examples")
-async def test_generate_examples(request: Request):
-    return {
-        "status": "success",
-        "examples": {
-            "food": [
-                "Качество еды оставляет желать лучшего.",
-                "Блюда были недостаточно горячие, когда их принесли.",
-                "Общее впечатление от ужина было отрицательным."
-            ],
-            "service": [
-                "Интерьер ресторана создает уютную атмосферу, а управление ожиданием было на высшем уровне, благодаря отличному обслуживанию.",
-                "Кухня впечатляет разнообразием блюд, и стоит отметить, что управление ожиданием не омрачило вечер, благодаря отличному обслуживанию.",
-                "Персонал проявил себя с лучшей стороны, обеспечивая быстрое обслуживание и комфортное управление ожиданием, что в сочетании с отличным обслуживанием сделало наш визит незабываемым."
-            ]
-        }
-    }
+    Returns:
+        dict: Nothing
+    """    
+    return {}
 
 @app.post("/create_user")
 async def create_user(request: Request):
+    """User creation endpoint
+
+    Args:
+        request (Request)
+
+    Returns:
+        dict: registration status
+    """    
     data = await request.json()
     try:
         DBManager.create_user(data["login"], data["password"], data["email"])
-        print("success")
         return {"status":"Success", "message":"Succesfully created new user!"}
     except Exception as e:
-        print(e)
         return {"status":"Error", "message":f"{e}"}
 
 @app.post("/login")
 async def login(request: Request):
+    """Login endpoint
+
+    Args:
+        request (Request)
+
+    Returns:
+        dict: status and token
+    """    
     data = await request.json()
-    #try:
-    access_token=DBManager.login_user(data["login"], data["password"])
-    return {"status":"Success", "message":access_token}
-    #except Exception as e:
-    #    return {"status":"Error", "message":f"Wrong login or password"}
+    try:
+        access_token=DBManager.login_user(data["login"], data["password"])
+        return {"status":"Success", "message":access_token}
+    except Exception as e:
+        return {"status":"Error", "message":f"Wrong login or password"}
 
 @app.get("/projects")
 async def get_all_projects(request:Request):
+    """endpoints for projects info
+
+    Args:
+        request (Request): _description_
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+
+    Returns:
+        dict: _description_
+    """    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -126,24 +158,35 @@ async def get_all_projects(request:Request):
         raise HTTPException(status_code=401, detail="Invalid authorization header format")
     
     access_token = parts[1]
-    #try:
-    user = DBManager.get_user_by_access_token(access_token)
-    if not user:
-        return {"status":"Error", "message":"Wrong acess token!"}
-    if user.access_token == access_token:
-        projects=DBManager.get_projects_by_user(user.id)
-        result={"status":"Success", "result":[]}
-        for p in projects:
-            result["result"]+=[{"id":p.id,"name":p.name, "date":p.created_at}]
-        return result
-    return {"status":"Error", "message":"Wrong token!"}
-    #except Exception as e:
-    #    return {"status":"Error", "message":e}
+    try:
+        user = DBManager.get_user_by_access_token(access_token)
+        if not user:
+            return {"status":"Error", "message":"Wrong acess token!"}
+        if user.access_token == access_token:
+            projects=DBManager.get_projects_by_user(user.id)
+            result={"status":"Success", "result":[]}
+            for p in projects:
+                result["result"]+=[{"id":p.id,"name":p.name, "date":p.created_at}]
+            return result
+        return {"status":"Error", "message":"Wrong token!"}
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Error on server side")
 
 @app.post("/create_project")
 async def create_project(request:Request):
+    """Project creation endpoint
+
+    Args:
+        request (Request)
+
+    Raises:
+        HTTPException: Invalid authorization header format
+        HTTPException: Authorization header missing
+
+    Returns:
+        dict: creation status
+    """    
     data = await request.json()
-    print(data)
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -170,6 +213,20 @@ async def create_project(request:Request):
 
 @app.get("/project")
 async def get_project(request:Request, project_id:int):
+    """Project info endpoint
+
+    Args:
+        request (Request)
+        project_id (int): project identificator
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: project info
+    """    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -194,9 +251,22 @@ async def get_project(request:Request, project_id:int):
         return {"status":"Success", "message":"Succesfully got project info", "info":info, "operations_info":operations}
     raise HTTPException(status_code=401, detail="Wrong access token!")
 
-"""Генерация примеров для разметки"""
 @app.post("/generate_examples")
 async def generate_examples(request: Request, background_tasks: BackgroundTasks):
+    """Endpoint to start generation operation
+
+    Args:
+        request (Request)
+        background_tasks (BackgroundTasks)
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: operation status
+    """    
     data = await request.json()
     project_id=data["project_id"]
     auth_header = request.headers.get("Authorization")
@@ -227,6 +297,20 @@ async def generate_examples(request: Request, background_tasks: BackgroundTasks)
 """Получить сгенерированный примеры"""
 @app.get("/get_examples")
 async def get_examples(request: Request, project_id: int):
+    """Endpoint to get generated examples
+
+    Args:
+        request (Request)
+        project_id (int): project identificator
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: generated examples
+    """    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -255,12 +339,26 @@ async def get_examples(request: Request, project_id: int):
 
 @app.post("/save-reviews")
 async def save_reviews(request: Request, background_tasks: BackgroundTasks):
+    """Dataset generation endpoint
+
+    Args:
+        request (Request)
+        background_tasks (BackgroundTasks)
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: status
+    """    
     data = await request.json()
     project_id=data["project_id"]
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Authorization header missing")
-    # Проверяем формат "Bearer <token>"
+
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization header format")
@@ -277,13 +375,27 @@ async def save_reviews(request: Request, background_tasks: BackgroundTasks):
             return {'status':"Error", "message":"Its already done"}
         
         # Запускаем фоновую задачу
-        background_tasks.add_task(process_save_reviews_task, data, project_id)
+        background_tasks.add_task(process_save_reviews_task, project_id)
         
         return {"status": "success"}
     raise HTTPException(status_code=401, detail="Wrong access token!")
 
 @app.post("/train_model")
 async def train_model(request: Request, background_tasks: BackgroundTasks):
+    """Endpoint to start model training 
+
+    Args:
+        request (Request)
+        background_tasks (BackgroundTasks)
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: operation status
+    """  
     data = await request.json()
     project_id=data["project_id"]
     auth_header = request.headers.get("Authorization")
@@ -316,36 +428,23 @@ async def train_model(request: Request, background_tasks: BackgroundTasks):
         return {"status": "success"}
     raise HTTPException(status_code=401, detail="Wrong access token!")
 
-#@app.post("/train_model")
-#async def train_model(request: Request, background_tasks: BackgroundTasks):
-#    data = await request.json()
-#    project_id=data["project_id"]
-#    auth_header = request.headers.get("Authorization")
-#    
-#    if not auth_header:
-#        raise HTTPException(status_code=401, detail="Authorization header missing")
-#    
-#    # Проверяем формат "Bearer <token>"
-#    parts = auth_header.split()
-#    if len(parts) != 2 or parts[0].lower() != "bearer":
-#        raise HTTPException(status_code=401, detail="Invalid authorization header format")
-#    
-#    access_token = parts[1]
-#    user = DBManager.get_user_by_access_token(access_token)
-#    if not user:
-#        return {"status":"Error", "message":"Wrong acess token!"}
-#    project = DBManager.get_project_by_id(project_id)
-#    if user.access_token == access_token and project.user_id==user.id:
-#        if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Done":
-#            return {"status":"Error", "message":"Previous operation not completed"}
-#        if DBManager.get_operation_info(project_id, "Model training")["status"] == "Done":
-#            return {'status':"Error", "message":"Its already done"}
-#        background_tasks.add_task(process_train_model_task, data, project_id)
-#        return {"status": "success"}
-#    raise HTTPException(status_code=401, detail="Wrong access token!")
 
 @app.post("/analyse_reviews")
 async def analyse_reviews(request: Request, background_tasks: BackgroundTasks):
+    """Endpoint to start review analysis
+
+    Args:
+        request (Request)
+        background_tasks (BackgroundTasks)
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: operation status
+    """  
     data = await request.json()
     project_id=data["project_id"]
     auth_header = request.headers.get("Authorization")
@@ -376,6 +475,20 @@ async def analyse_reviews(request: Request, background_tasks: BackgroundTasks):
 """Получить статус обучения модели"""
 @app.get("/get_train_model_status")
 async def get_train_model_status(request: Request, project_id: int):
+    """Endpoint for model training progress
+
+    Args:
+        request (Request)
+        project_id (int)
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong access token
+
+    Returns:
+        dict: training progress
+    """    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -399,9 +512,13 @@ async def get_train_model_status(request: Request, project_id: int):
         return {"status":"Success","data":res}
     raise HTTPException(status_code=401, detail="Wrong access token!")
 
-# Фоновые задачи
-async def process_save_reviews_task(data: dict, project_id: int):
-    """Фоновая задача для сохранения отзывов"""
+
+async def process_save_reviews_task(project_id: int):
+    """Background task for dataset generaion
+
+    Args:
+        project_id (int): project identificator
+    """    
     try:
         if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Error":
             return
@@ -433,7 +550,11 @@ async def process_save_reviews_task(data: dict, project_id: int):
         DBManager.change_operation_info(project_id, "Dataset generation", 4, 0.0)  # Статус ошибки
 
 async def process_generate_reviews_task(project_id):
-    """Фоновая задача для генерации примеров"""
+    """Background task for examples generation
+
+    Args:
+        project_id (int): project identificator
+    """    
     try:
         if DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Examples generation")["status"] != "Error":
             return
@@ -452,28 +573,12 @@ async def process_generate_reviews_task(project_id):
         DBManager.change_operation_info(project_id,"Examples generation",4, 0.0)
         print(f"Error in generate_reviews_task: {e}")
 
-async def process_train_model_task(data:dict, project_id):
-    """Фоновая задача для генерации примеров"""
-    try:
-        if DBManager.get_operation_info(project_id, "Model training")["status"] != "Not started":
-            return
-        
-        DBManager.change_operation_info(project_id, "Model training", 2, 0.0)
-        dir_name=DBManager.get_project_by_id(project_id).dir_name
-        dataset_path=f"{NEW_SAVE_DIR}{dir_name}/dataset/dat"
-        dataset_path=dataset_path.replace("/", "\\")
-        model = ABSAModel()
-        await asyncio.to_thread(model.train, project_id, int(data["epochs"]), int(data["batch_size"]))
-        DBManager.change_operation_info(project_id, "Model training", 3, 1.0)
-    except Exception as e:
-        DBManager.change_operation_info(project_id,"Model training",4, 0.0)
-        print(f"Error in train_model_task: {e}")
 
 
 async def new_process_train_model_task():
-    """Фоновая задача для генерации примеров"""
+    """Background task for model training
+    """    
     niq=DBManager.next_in_queue()
-    print(niq)
     while niq:
         project_id=niq["project_id"]
         try:
@@ -491,7 +596,11 @@ async def new_process_train_model_task():
         niq=DBManager.next_in_queue()
 
 async def process_review_analysis_task(project_id):
-    """Фоновая задача для анализа отзывов"""
+    """Background task for review analysis
+
+    Args:
+        project_id (int): project identificator
+    """    
     try:
         if DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Not started" and  DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Error":
             return
@@ -509,10 +618,23 @@ async def process_review_analysis_task(project_id):
 
 @app.get("/chart-data")
 async def get_chart_data(request: Request, project_id ,sentiment: str = "all"):
-    """
-    API endpoint для получения данных для диаграмм
-    sentiment: 'positive', 'negative', 'neutral', 'all'
-    """
+    """Endpoint for chart data
+
+    Args:
+        request (Request)
+        project_id (int): project
+        sentiment (str): Value of filter by sentiments. Defaults to "all".
+
+    Raises:
+        HTTPException: Authorization header missing
+        HTTPException: Invalid authorization header format
+        HTTPException: Wrong acess token
+        HTTPException: Review analysis is not done
+        HTTPException: No data
+
+    Returns:
+        dict: Data for charts
+    """    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
@@ -566,9 +688,13 @@ async def get_chart_data(request: Request, project_id ,sentiment: str = "all"):
         "data": filtered_data
     }
 
-# Тестовый endpoint для проверки
 @app.get("/test")
 async def test():
+    """Test endpoint
+
+    Returns:
+        dict: Successful response
+    """    
     return {"status": "ok", "message": "Server is running"}
 
 if __name__ == "__main__":

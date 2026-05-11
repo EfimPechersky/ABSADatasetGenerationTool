@@ -3,13 +3,16 @@ import requests
 class LLM:
     _instance = None
     __apiurl:str
-    """Singletone"""
     def __new__(cls, *args, **kwargs):
+        """Class for LLM API management
+
+        Returns:
+            LLM: created instance
+        """        
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    """Ссылка на API"""
     @property
     def apiurl(self):
         return self.__apiurl
@@ -20,19 +23,23 @@ class LLM:
             raise Exception("Wrong type of url!")
         self.__apiurl=value
     
-    """Отправка запроса и получение ответа"""
     def send_prompt(self, messages):
+        """Send prompt to API
+
+        Args:
+            messages (list): list of messages
+
+        Returns:
+            str: LLM response
+        """        
         headers = {
             "Content-Type": "application/json"
         }
 
-        # Отправка POST запроса
 
         response = requests.post(self.apiurl+"/test", json=messages, headers=headers)
         
-        # Проверка статуса ответа
         response.raise_for_status()
-        
-        # Вывод результата
+
         return response.text
 

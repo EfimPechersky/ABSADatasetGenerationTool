@@ -9,15 +9,22 @@ from DatasetModels.DatasetModel import Dataset
 from Storage.DatabaseManager import DatabaseManager
 import os
 import re
-"""Класс, описывающий модель ABSA"""
 class ABSAModel:
     NEW_SAVE_DIR = "./ProjectsStorage/"
-    """Конструктор"""
     def __init__(self):
+        """Class for ABSA model management
+        """        
         self.model=ATEPCCheckpointManager.get_aspect_extractor("./Model/checkpoints/ATEPC_MULTILINGUAL_CHECKPOINT")
     
-    """Обучение"""
+
     def train(self, project_id, epochs=10, batch_size=1):
+        """Model training
+
+        Args:
+            project_id (int): project identificator
+            epochs (int): Number of epochs. Defaults to 10.
+            batch_size (int): Size of batch. Defaults to 1.
+        """        
         DBManager=DatabaseManager()
         dir_name=DBManager.get_project_by_id(project_id).dir_name
         dataset_path=f"{self.NEW_SAVE_DIR[2:]}{dir_name}/dataset/dat"
@@ -53,10 +60,23 @@ class ABSAModel:
                                       ).load_trained_model()
         
     def atepc(self, review):
+        """Analyse review using model
+
+        Args:
+            review (str): review fro analysis
+
+        Returns:
+            dict: model prediction
+        """        
         result = self.model.predict(review)
         return result
     
     def analyse_all_reviews(self, project_id):
+        """Analyse all reviews in project
+
+        Args:
+            project_id (int): project identificator
+        """        
         DBManager=DatabaseManager()
         dir_name=DBManager.get_project_by_id(project_id).dir_name
         data=FileManager.load_json(f"{self.NEW_SAVE_DIR}{dir_name}/reviews.json")
@@ -74,6 +94,11 @@ class ABSAModel:
 
     
     def load_model_from_file(self, project_id):
+        """load trained model from project dictionary
+
+        Args:
+            project_id (int): project identificator
+        """        
         DBManager=DatabaseManager()
         dir_name=DBManager.get_project_by_id(project_id).dir_name
         path = f'{self.NEW_SAVE_DIR}{dir_name}/Model/checkpoints'
@@ -83,6 +108,14 @@ class ABSAModel:
     
     @staticmethod
     def update_info_from_logs(project_id):
+        """Get training progress from logs
+
+        Args:
+            project_id (int): project identificator
+
+        Returns:
+            True: Successfuly readed logs
+        """        
         NEW_SAVE_DIR = "./ProjectsStorage/"
         DBManager=DatabaseManager()
         dir_name=DBManager.get_project_by_id(project_id).dir_name

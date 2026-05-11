@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker,Mapped,mapped_column,relationship
 from Storage.Base import Base
 
 class ModelTraining(Base):
+    """Model for model training information"""
     __tablename__ = 'model_train'
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(Integer, ForeignKey("projects.id"))

@@ -604,7 +604,7 @@
             
             let actionButtons = '';
             
-            if (opKey === 'Model training' && op.status === 'Done' || op.status === 'In progress') {
+            if (opKey === 'Model training' && (op.status === 'Done' || op.status === 'In progress')) {
                 actionButtons = `
                     <div class="operation-actions" style="display: flex; gap: 10px;">
                         <button class="run-btn" id="btn-${idSuffix}" 
@@ -627,6 +627,16 @@
                         </button>
                         <button class="details-btn" onclick="showReviewAnalysisDashboard()">
                             📊 Результаты
+                        </button>
+                    </div>
+                `;
+            } else if (opKey === 'Model training' && op.status === 'Queue') {
+                actionButtons = `
+                    <div class="operation-actions">
+                        <button class="run-btn" id="btn-${idSuffix}" 
+                            onclick="${functionName}()" 
+                            ${isDisabled ? 'disabled' : ''}>
+                            В очереди...
                         </button>
                     </div>
                 `;

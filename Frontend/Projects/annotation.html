@@ -534,9 +534,8 @@ new Vue({
             while (index >= this.allReviews[this.categories[this.currentCategoryIndex]].length) {
                 this.currentCategoryIndex += 1;
                 if (this.currentCategoryIndex >= this.categories.length) {
-                    // Все категории закончились
                     alert('Поздравляем! Вы аннотировали все примеры!');
-                    this.currentReview = null;
+                    this.currentCategoryIndex -= 1;
                     return;
                 }
                 this.indexes[this.categories[this.currentCategoryIndex]] += 1;

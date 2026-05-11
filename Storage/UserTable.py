@@ -3,7 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker,Mapped,mapped_column,relationship
 from Storage.Base import Base
 from typing import List
+
 class User(Base):
+    """Model of table with user info"""
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String(30))

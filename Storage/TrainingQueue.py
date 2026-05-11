@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker, Mapped, mapped_column, relationship
 from Storage.Base import Base
 
 class Queue(Base):
+    """Model for model training queue info"""
     __tablename__ = 'queue'
     
     id: Mapped[int] = mapped_column(primary_key=True)
