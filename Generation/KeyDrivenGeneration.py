@@ -142,7 +142,7 @@ class KeyDrivenGenerator:
             domain (str): domain of reviews
             examples (list): real reviews for reference
         """        
-        examples_num=1
+        examples_num=10
         for category in self.__categories:
             self.generated_examples[category]=[]
             count=0

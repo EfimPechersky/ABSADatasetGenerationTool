@@ -31,7 +31,7 @@ def generate_code():
 DBManager=DatabaseManager()
 # Инициализация сервисов
 model = LLM()
-model.apiurl = "https://bumpy-sheep-notice.loca.lt"
+model.apiurl = "https://e077-34-87-23-109.ngrok-free.app"
 
 app = FastAPI()
 
@@ -374,8 +374,7 @@ async def save_reviews(request: Request, background_tasks: BackgroundTasks):
         if DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Not started" and DBManager.get_operation_info(project_id, "Dataset generation")["status"] != "Error":
             return {'status':"Error", "message":"Its already done"}
         
-        # Запускаем фоновую задачу
-        background_tasks.add_task(process_save_reviews_task, project_id)
+        background_tasks.add_task(process_save_reviews_task,data, project_id)
         
         return {"status": "success"}
     raise HTTPException(status_code=401, detail="Wrong access token!")
@@ -513,10 +512,11 @@ async def get_train_model_status(request: Request, project_id: int):
     raise HTTPException(status_code=401, detail="Wrong access token!")
 
 
-async def process_save_reviews_task(project_id: int):
+async def process_save_reviews_task(data, project_id: int):
     """Background task for dataset generaion
 
     Args:
+        data(dict):data
         project_id (int): project identificator
     """    
     try:
@@ -605,9 +605,13 @@ async def process_review_analysis_task(project_id):
         if DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Not started" and  DBManager.get_operation_info(project_id, "Review analysis")["status"] != "Error":
             return
         DBManager.change_operation_info(project_id, "Review analysis", 2, 0.0)
-        model=await asyncio.to_thread(ABSAModel)
-        model.load_model_from_file(project_id)
-        await asyncio.to_thread(model.analyse_all_reviews,project_id)
+        dir_name=DBManager.get_project_by_id(project_id).dir_name
+        import os
+
+        if not os.path.isfile(f"{NEW_SAVE_DIR}{dir_name}/analysed_reviews.json"):
+            model=await asyncio.to_thread(ABSAModel)
+            model.load_model_from_file(project_id)
+            await asyncio.to_thread(model.analyse_all_reviews,project_id)
         DBManager.change_operation_info(project_id,"Review analysis",2, 0.7)
         AS=AspectClassifier(project_id)
         await asyncio.to_thread(AS.count_aspects_per_category)
@@ -692,7 +696,8 @@ async def test():
 
     Returns:
         dict: Successful response
-    """    
+    """
+    DBManager.change_operation_info(1, "Review analysis", 1, 0.0)
     return {"status": "ok", "message": "Server is running"}
 
 if __name__ == "__main__":

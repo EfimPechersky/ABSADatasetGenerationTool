@@ -76,7 +76,7 @@ class ABSAModel:
 
         Args:
             project_id (int): project identificator
-        """        
+        """
         DBManager=DatabaseManager()
         dir_name=DBManager.get_project_by_id(project_id).dir_name
         data=FileManager.load_json(f"{self.NEW_SAVE_DIR}{dir_name}/reviews.json")

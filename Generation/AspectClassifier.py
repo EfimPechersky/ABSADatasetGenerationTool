@@ -37,7 +37,7 @@ class AspectClassifier:
 
     def classificate_aspects(self):
         """Classificates aspects by categories of domain
-        """        
+        """   
         if self.process_data==None or self.categories==None:
             operation_exception("Data is empty!")
         all_aspects=[]
@@ -45,14 +45,26 @@ class AspectClassifier:
             for asp in rev[1].keys():
                 all_aspects+=[asp]
         all_aspects=list(set(all_aspects))
-        gen_prompt = Prompts.define_aspects_categories(self.categories,all_aspects)
-        messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
-        res=self.model.send_prompt(messages)
-        print(res)
-        lst=res[res.index("{"):res.index("}")+1]
-        lst=lst.replace("\n", "")
-        lst=lst.replace("'",'"')
-        self.keywords=json.loads(lst)
+        self.keywords={}
+        for i in range(0, len(all_aspects)//10):
+            print(i, len(all_aspects)//10)
+            gen_prompt = Prompts.define_aspects_categories(self.categories,all_aspects[i*10:(i+1)*10])
+            messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
+            print(messages)
+            res=self.model.send_prompt(messages)
+            print(res)
+            lst=res[res.index("{"):res.index("}")+1]
+            lst=lst.replace("\n", "")
+            lst=lst.replace("'",'"')
+            print(lst)
+            new_keywords=json.loads(lst)
+            print(new_keywords)
+            for asp in new_keywords.keys():
+                print(asp)
+                if asp not in self.keywords:
+                    self.keywords[asp]=[]
+                self.keywords[asp]+=new_keywords[asp]
+        print(self.keywords)
         
     
     def get_category(self, aspect):

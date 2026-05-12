@@ -399,7 +399,7 @@ class DatabaseManager:
             batch_size (int)
             num_epochs (int)
         """        
-         with self.session() as session:
+        with self.session() as session:
             project=session.get(Project, project_id)
             new_queue_row = Queue(project=project, batch_size=batch_size, num_epochs=num_epochs)
             session.add(new_queue_row)
