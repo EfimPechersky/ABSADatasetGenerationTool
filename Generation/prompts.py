@@ -1,6 +1,5 @@
 """Класс, содержащий все запросы"""
 class Prompts:
-    """Описание задачи, помогает погрузить модель в контекст"""
     absa_description="""
         Aspect-Based Sentiment Analysis (ABSA) is a method used to understand people's opinions about specific features or parts (aspects) of a product, service, or topic. It goes beyond simply knowing if the overall sentiment is positive or negative, by identifying opinions about particular aspects.
 
@@ -19,15 +18,33 @@ class Prompts:
         In the sentence "The battery life is disappointing," the aspect term is "battery life", the opinion term is "disappointing", and the sentiment is negative.
     """
 
-    """Запрос для генерации перефразированных примеров"""
     def get_semantic_paraphrasing_prompt(domain, sentence):
+        """Prompt for semantic perephrase
+
+        Args:
+            domain (str): domain of reviews
+            sentence (str): sentence for reference
+
+        Returns:
+            str: prompt
+        """        
         return f'''Generate 10 review sentences about {domain} that convey a similar meaning to the provided review
         sentence: “{sentence}”. Each sentence should capture the essence of the original review while presenting it in a different way. GENERATED SENTENCES SHULD BE ON RUSSIAN LANGUAGE.START GENERATION WITHOUT ANY PREAMBLE!DONT CHANGE OUTPUT FORMAT!
         Output Format:
         SAMPLE i: generated sentence'''
     
-    """Запрос для разметки перефразированных примеров"""
+
     def get_aspect_annotation_prompt(source_sentence, sentences, aspects):
+        """Prompt for annotation generated samples
+
+        Args:
+            source_sentence (str): sentence, used for reference
+            sentences (list): generated sentences
+            aspects (dict): aspects in source centence
+
+        Returns:
+            str: prompt
+        """        
         prompt = f'''Provide aspect annotations for ten sentences that convey a similar meaning to the given source sentence. The source sentence includes an annotated aspect
         term. Your task is to identify and annotate the aspect term within each of the
         ten sentences, ensuring that the aspect term is a subsequence within its sentence and that carries a similar meaning to the source aspect term.
@@ -48,10 +65,20 @@ class Prompts:
             prompt+=f"Sentence {i}: {sentences[i]}"
         return prompt
     
-    '''
-    Запрос для генерации примеров при помощи метода комбинации
-    '''
+
     def combination_prompt (domain,example1,aspects1, example2, aspects2):
+        """Prompt for generation using combination method
+
+        Args:
+            domain (str): domain of reviews
+            example1 (str): first text of review
+            aspects1 (dict): annotation for first review
+            example2 (str): second text of review
+            aspects2 (dict): annotation for second review
+
+        Returns:
+            str: prompt
+        """        
         examples="<sample>\n"
         examples+="<sentence>\n"
         examples+=example1+"\n"
@@ -136,7 +163,15 @@ class Prompts:
         '''
 
     def prompt_AspectTerm(domain, category):
-        # brainstorm aspect terms
+        """Brainstorm generation common aspects for category
+
+        Args:
+            domain (str): domain of review
+            category (str): category of domain
+
+        Returns:
+            str: prompt
+        """        
         prompt = (
             f"Brainstorm a list of commonly used aspect terms on Russian Language for the aspect category **{category}** within the **{domain}** domain.\n"
             "\n"
@@ -154,7 +189,15 @@ class Prompts:
         return prompt
 
     def prompt_OpinionTerm(domain, category):
-        # brainstorm opinion terms
+        """Brainstorm generation common opinions for category
+
+        Args:
+            domain (str): domain of review
+            category (str): category of domain
+
+        Returns:
+            str: prompt
+        """     
         prompt = (
             f"Brainstorm a list of commonly used opinion terms on Russian Language for the aspect category **{category}** within the **{domain}** domain.\n"
             "\n"
@@ -173,13 +216,24 @@ class Prompts:
 
         return prompt
 
-    # *********************************************************************************************************************
-
     '''
     Attributed Prompts in Key-Point-Driven Synthesis
     '''
 
     def generate_prompt(domain,aspect,category,opinion,sentiment,example):
+        """Generate sample, using domain, category, opinion, aspect, sentiment and reference
+
+        Args:
+            domain (str): domain for review
+            aspect (str): generated aspect
+            category (str): category of aspect
+            opinion (str): generated opinion
+            sentiment (str): sentioment of opinion
+            example (str):  real review for reference
+
+        Returns:
+            str: sprompt
+        """        
         prompt = (f'''Write 3 review sentences for the {domain}, WRITE TEXT ON RUSSIAN LANGUAGE
         Requirements:
         - Keep a consistent style and annotation standard with the examples.
@@ -209,6 +263,15 @@ class Prompts:
         return prompt
     
     def define_aspects_categories(categories, aspects):
+        """Prompt for aspect category classification
+
+        Args:
+            categories (list): all categories of domain
+            aspects (list): aspect terms
+
+        Returns:
+            str: prompt
+        """        
         return """
         You are given a list of aspects and a set of predefined categories. Your task is to assign each aspect to the most appropriate category. If an aspect does not fit any category, assign it to "Other". Output the result strictly in the following JSON format:
 

@@ -1,11 +1,13 @@
-"""
-Исключение при проверки аргумента
-"""   
+ 
 class argument_exception(Exception):
+    """
+    Exception raised because of argument
+    """    
     pass     
     
-"""
-Исключение при выполнении бизнес операции
-"""  
+
 class operation_exception(Exception):
+    """
+    Exception raised because of business operation
+    """    
     pass 

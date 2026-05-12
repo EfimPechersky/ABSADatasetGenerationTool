@@ -16,9 +16,9 @@ from sqlalchemy import func
 import jwt
 from datetime import datetime, timedelta
 
-SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2024"  # В продакшене храните в .env
+SECRET_KEY = "your-super-secret-key-change-this-to-something-very-secure-2026"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 часа
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     """Создание JWT токена"""
     to_encode = data.copy()
@@ -31,8 +31,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
 class DatabaseManager:
+    """Class for database management
+    """    
     _instance = None
     _initialized=False
     engine=None
@@ -51,7 +52,7 @@ class DatabaseManager:
         self.engine = create_engine('postgresql://postgres:mysecretpassword@localhost:5432/postgres')
         self.session = sessionmaker(bind=self.engine)
         if not self.__check_tables():
-            Base.metadata.drop_all(bind=self.engine)
+            #Base.metadata.drop_all(bind=self.engine)
             Base.metadata.create_all(bind=self.engine)
             with self.session() as session:
                 self.op_types=[
@@ -75,24 +76,32 @@ class DatabaseManager:
     
 
     def __check_tables(self):
+        """Check if all tables exists
+
+        Returns:
+            True: All tables exists
+            False: Some tables doesn't exists
+        """        
         inspector = inspect(self.engine)
         table_list = inspector.get_table_names()
         for table in self.tables:
             if table not in table_list:
                 return False
         return True
-    
-    @staticmethod
-    def validate(value, value_type, length=None):
-        if not isinstance(login, value_type):
-            raise argument_exception(f"Wrong type of value '{value.__name__}'")
-        if length!=None:
-            if len(login)<=0 or len(login)>length:
-                raise argument_exception(f"Wrong length of value '{value.__name__}'")
 
     def create_user(self, login, password_hash, email):
+        """Account registration
+
+        Args:
+            login (str): username
+            password_hash (str): hashed password
+            email (str): user email
+
+        Raises:
+            argument_exception: User with this login already exists!
+            argument_exception: User with this email already exists!
+        """        
         with self.session() as session:
-            # Проверка существования пользователя
             stmt = select(func.count(User.id)).where(User.login == login)
             row_count = session.scalar(stmt)
             if row_count > 0:
@@ -101,14 +110,23 @@ class DatabaseManager:
             row_count = session.scalar(stmt)
             if row_count > 0:
                 raise argument_exception("User with this email already exists!")
-            
-            # Пароль уже пришел в виде хеша, сохраняем его как есть
-            # (или можно дополнительно захешировать bcrypt для двойной защиты)
             new_user = User(login=login, password=password_hash, email=email)
             session.add_all([new_user])
             session.commit()
 
     def login_user(self, login, password_hash):
+        """Aouthorize user
+
+        Args:
+            login (str): username
+            password_hash (str): hashed password
+
+        Raises:
+            argument_exception: Wrong login or password
+
+        Returns:
+            _type_: _description_
+        """        
         with self.session() as session:
             stmt = select(User).where(User.login == login)
             user = session.scalars(stmt).one()
@@ -127,18 +145,51 @@ class DatabaseManager:
   
     
     def get_user_by_id(self, id):
+        """get user by his id
+
+        Args:
+            id (int): identificator
+
+        Returns:
+            User: found user
+            False: user not found
+        """        
         with self.session() as session:
             stmt = select(User).where(User.id==id)
-            user = session.scalars(stmt).one()
-            return user
+            try:
+                user = session.scalars(stmt).one()
+                return user
+            except:
+                return False
     
     def get_user_by_login(self, login):
+        """get user by his login
+
+        Args:
+            login (str): username
+
+        Returns:
+           User: found user
+           False: user not found
+        """        
         with self.session() as session:
             stmt = select(User).where(User.login==login)
-            user = session.scalars(stmt).one()
-            return user
+            try:
+                user = session.scalars(stmt).one()
+                return user
+            except:
+                return False
     
     def get_user_by_access_token(self, access_token):
+        """get user by access token
+
+        Args:
+            access_token (str): access token
+
+        Returns:
+            User: found user
+            False: user not found
+        """        
         with self.session() as session:
             stmt = select(User).where(User.access_token==access_token)
             try:
@@ -148,12 +199,24 @@ class DatabaseManager:
                 return False
 
     def get_all_users(self):
+        """Get all users
+
+        Returns:
+            list: list of all users
+        """        
         with self.session() as session:
             stmt = select(User)
             users = session.scalars(stmt)
             return users
     
     def create_project(self, name, user_id, dir_name):
+        """Create project
+
+        Args:
+            name (str): project name
+            user_id (int): user identificator
+            dir_name (str): project directory path
+        """        
         with self.session(autoflush=False) as session:
             user=session.get(User, user_id)
             print(user)
@@ -169,35 +232,82 @@ class DatabaseManager:
             session.commit()
     
     def get_project_by_id(self, project_id):
+        """get project by id
+
+        Args:
+            project_id (int): project identificator
+
+        Returns:
+            Project: found project
+            False: project not found
+        """        
         with self.session() as session:
             stmt = select(Project).where(Project.id==project_id)
-            project = session.scalars(stmt).one()
-            return project
+            try:
+                project = session.scalars(stmt).one()
+                return project
+            except:
+                False
     
     def get_projects_by_user(self, user_id):
+        """get all user's projects
+
+        Args:
+            user_id (int): user identificator
+
+        Returns:
+            list: all projects
+        """        
         with self.session() as session:
             stmt = select(Project).where(Project.user_id==user_id)
             projects = session.scalars(stmt).all()
             return projects
     
     def create_operation(self, project, operation_type, status, progress):
+        """Create operation for project
+
+        Args:
+            project (Project)
+            operation_type (Operation)
+            status (Status)
+            progress (float)
+        """        
         with self.session() as session:
             new_operation=Operation(project=project, operation_type=operation_type, status=status, progress=progress)
             session.add_all([new_operation])
             session.commit()
     
     def get_operation_by_id(self, id):
+        """Get operation by id
+
+        Args:
+            id (int): identificator
+
+        Returns:
+            Operation: found operation
+            False: operation not found
+        """        
         with self.session() as session:
             stmt = select(Operation).where(Operation.id==id)
-            operation = session.scalars(stmt).one()
-            return operation
+            try:
+                operation = session.scalars(stmt).one()
+                return operation
+            except:
+                return False
     
     def get_operations_by_project(self, project_id):
+        """Get all project's operations
+
+        Args:
+            project_id (int): project identificator
+
+        Returns:
+            list: list of all operations
+        """        
         with self.session() as session:
             stmt = select(Operation).where(Operation.project_id == project_id)
             operations = session.scalars(stmt).all()
             
-            # Преобразуем объекты в словари ДО закрытия сессии
             result = []
             for op in operations:
                 result.append({
@@ -210,6 +320,14 @@ class DatabaseManager:
             return result
     
     def change_operation_info(self, project_id, operation_type:str, status_id:int=None, progress:float=None):
+        """Change operation info
+
+        Args:
+            project_id (int): project identificator
+            operation_type (str): Type of operation
+            status_id (int): Status identificator. Defaults to None.
+            progress (float): prgress of operation. Defaults to None.
+        """        
         with self.session() as session:
             stmt = select(Operation).where(Operation.project_id == project_id).where(Operation.operation_type.has(OperationType.name == operation_type))
             operation = session.scalars(stmt).one()
@@ -223,6 +341,15 @@ class DatabaseManager:
             session.commit()
     
     def get_operation_info(self, project_id, operation_type:str):
+        """get info about operation
+
+        Args:
+            project_id (int): project identificator
+            operation_type (str): operation type
+
+        Returns:
+            dict: operation info
+        """        
         with self.session() as session:
             stmt = select(Operation).where(Operation.project_id == project_id).where(Operation.operation_type.has(OperationType.name == operation_type))
             operation = session.scalars(stmt).one()
@@ -230,6 +357,21 @@ class DatabaseManager:
     
 
     def create_model_train_row(self, project_id, current_epoch, num_epochs, batch_size, apc_acc, apc_f1, ate_f1):
+        """Create info about model training
+
+        Args:
+            project_id (int)
+            current_epoch (int)
+            num_epochs (int)
+            batch_size (int)
+            apc_acc (float)
+            apc_f1 (float)
+            ate_f1 (float)
+
+        Returns:
+            False: row already exists
+            True: row created
+        """        
         with self.session() as session:
             project=session.get(Project, project_id)
             stmt = select(func.count(ModelTraining.id)).where(ModelTraining.project_id==project_id).where(ModelTraining.current_epoch == current_epoch)
@@ -250,13 +392,25 @@ class DatabaseManager:
         return True
     
     def add_to_queue(self, project_id, batch_size, num_epochs):
-         with self.session() as session:
+        """Add process to queue
+
+        Args:
+            project_id (int)
+            batch_size (int)
+            num_epochs (int)
+        """        
+        with self.session() as session:
             project=session.get(Project, project_id)
             new_queue_row = Queue(project=project, batch_size=batch_size, num_epochs=num_epochs)
             session.add(new_queue_row)
             session.commit()
 
     def complete_queue(self, project_id):
+        """Change status of training
+
+        Args:
+            project_id (int)
+        """        
         with self.session() as session:
             stmt = select(Queue).where(Queue.project_id == project_id)
             queue_row = session.scalars(stmt).one()
@@ -264,12 +418,22 @@ class DatabaseManager:
             session.commit()
 
     def get_count_queue(self):
+        """Get length of queue
+
+        Returns:
+            int: number of process in queue
+        """        
         with self.session() as session:
             stmt = select(func.count(Queue.id)).where(Queue.is_completed == False)
             row_count = session.scalar(stmt)
             return row_count
 
     def next_in_queue(self):
+        """get next process in queue
+
+        Returns:
+            dict: operation info
+        """        
         if self.get_count_queue()==0:
             return False
         with self.session() as session:
@@ -278,6 +442,14 @@ class DatabaseManager:
             return {"project_id":queue_row.project_id, "batch_size":queue_row.batch_size, "num_epochs":queue_row.num_epochs}
 
     def get_model_training_progress(self, project_id):
+        """get model training progress info
+
+        Args:
+            project_id (int)
+
+        Returns:
+            list: all model trining rows
+        """        
         with self.session() as session:
             stmt = select(ModelTraining).where(ModelTraining.project_id==project_id)
             rows = session.scalars(stmt).all()

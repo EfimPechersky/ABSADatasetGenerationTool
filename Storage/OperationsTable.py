@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker,Mapped,mapped_column,relationship
 from Storage.Base import Base
 
 class Operation(Base):
+    """Model for operation info"""
     __tablename__ = 'operations'
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(Integer, ForeignKey("projects.id"))

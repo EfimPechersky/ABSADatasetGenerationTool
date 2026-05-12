@@ -8,6 +8,12 @@ class Sample:
     __aspects: list = []
     
     def __init__(self, review: str = "", aspects: list = None):
+        """Sample for model training
+
+        Args:
+            review (str): review text. Defaults to "".
+            aspects (list): annotated aspects. Defaults to None.
+        """        
         self.review = review
         if aspects != None:
             self.aspects = aspects
@@ -38,18 +44,39 @@ class Sample:
             raise argument_exception("Wrong type of aspects")
     
     def add_aspect(self, value):
+        """Add annotated aspect
+
+        Args:
+            value (Aspect): aspect
+
+        Raises:
+            argument_exception: Aspect has wrong type or already added
+        """        
         if not isinstance(value, Aspect):
             raise argument_exception("Aspect has wrong type or already added")
         if value.term in self.review and value not in self.aspects:
             self.__aspects += [value]
     
     def to_json(self):
+        """Convert sample to json
+
+        Returns:
+            list: converted sample
+        """        
         result = [self.review, {}]
         for asp in self.__aspects:
             result[1][asp.term] = asp.sentiment
         return result
     
     def from_json(json):
+        """Convert sample from json
+
+        Args:
+            json (list): sample in json format
+
+        Returns:
+            False: cannot convert sample
+        """        
         if isinstance(json, list) and len(json) == 2:
             if isinstance(json[0], str) and isinstance(json[1], dict):
                 aspects = []
@@ -64,19 +91,21 @@ class Sample:
         return False
     
     def to_dat(self):
-        """Преобразовать пример в формат для обучения модели"""
+        """Convert sample to format for model training
+
+        Returns:
+            list: converted sample
+        """        
         nlp = spacy.load("ru_core_news_sm")
         doc = nlp(self.review)
         text_tokens = list(filter(lambda x: (not x in ["<", ">"]), [token.text for token in doc]))
         
-        # Подготавливаем все аспекты с их токенами и позициями
         all_aspects = []
         for asp in self.aspects:
             doc = nlp(asp.term)
             aspect_tokens = [token.text for token in doc]
             aspect_tokens = list(filter(lambda x: (not x in ["<", ">"]), aspect_tokens))
             
-            # Находим позиции аспекта в тексте
             for i in range(len(text_tokens) - len(aspect_tokens) + 1):
                 if [t.lower() for t in text_tokens[i:i+len(aspect_tokens)]] == [t.lower() for t in aspect_tokens]:
                     all_aspects.append({
@@ -88,29 +117,24 @@ class Sample:
                     })
                     break
         
-        # Создаем дублированные примеры для каждого аспекта
         dats = []
         for main_asp in all_aspects:
             dat = []
             marks = ['O'] * len(text_tokens)
             sentiments = ['-100'] * len(text_tokens)
             
-            # Размечаем ВСЕ аспекты в этом примере
             for asp in all_aspects:
-                # Определяем тональность для этого аспекта
                 if asp == main_asp:
                     sentiment = asp['sentiment']
                 else:
                     sentiment = '-100'
                 
-                # Размечаем токены аспекта
                 marks[asp['start']] = 'B-ASP'
                 sentiments[asp['start']] = sentiment
                 for j in range(1, len(asp['tokens'])):
                     marks[asp['start'] + j] = 'I-ASP'
                     sentiments[asp['start'] + j] = sentiment
             
-            # Собираем результат для этого примера
             for i, token in enumerate(text_tokens):
                 if token.strip():
                     dat.append([token.strip(), marks[i], sentiments[i].strip()])

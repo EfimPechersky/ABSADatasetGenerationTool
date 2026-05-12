@@ -1,2 +1,0 @@
-from pyabsa import ATEPCCheckpointManager
-aspect_extractor = ATEPCCheckpointManager.get_aspect_extractor("multilingual")

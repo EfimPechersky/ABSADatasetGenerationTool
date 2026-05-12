@@ -7,13 +7,16 @@ from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
 from Storage.DatabaseManager import DatabaseManager
-"""Класс, отвечающий за генерацию при помощи метода комбинации"""
 class CombinationGenerator:
     combinations_dataset:Dataset
     model:LLM
     DBManager:DatabaseManager
-    """Конструктор"""
     def __init__(self, project_id):
+        """Class for generation samples using commbination method
+
+        Args:
+            project_id (int): project identificator
+        """        
         self.combinations_dataset=Dataset()
         self.model=LLM()
         self.DBManager=DatabaseManager()
@@ -21,17 +24,35 @@ class CombinationGenerator:
 
 
     def __change_progress(self, progress, status_id=2):
+        """Change progress info for the generation process
+
+        Args:
+            progress (float): percent of completed work
+            status_id (int): identificator of current status. Defaults to 2.
+        """        
         if status_id==None:
             self.DBManager.change_operation_info(self.__project_id, "Dataset generation",2, progress)
         else:
             self.DBManager.change_operation_info(self.__project_id, "Dataset generation", status_id, progress)
     
     def __get_progress(self):
+        """get progress of operation
+
+        Returns:
+            float: progress
+        """        
         res=self.DBManager.get_operation_info(self.__project_id, "Dataset generation")
         return res["progress"]
 
-    """Преобразование ответа из xml в json"""
     def from_xml(xml):
+        """Convert LLM response to json
+
+        Args:
+            xml (str): LLM response in xml format
+
+        Returns:
+            dict: converted samples
+        """        
         if "<samples>" in xml:
             text_to_convert=xml[xml.index("<samples>"):xml.index("</samples>")+10].replace('"', ' ')
         else:
@@ -42,16 +63,38 @@ class CombinationGenerator:
             dct["samples"]=dct["samples"]["sample"]
         return dct
     
-    """Генерация примеров"""
     def generate_samples(self,dataset:Dataset):
+        """generate new samples using annotated dataset
+
+        Args:
+            dataset (Dataset): annotated dataset
+
+        Raises:
+            argument_exception: Wrong type of dataset
+        """        
         if not isinstance(dataset,Dataset):
             raise argument_exception("Wrong type of dataset")
         self.combinations_dataset.domain=dataset.domain
         samples=[]
         for i in range(0,len(dataset.samples)):
             for j in range(i+1,len(dataset.samples)):
-                gen_prompt = Prompts.combination_prompt(dataset.domain,dataset.samples[i].review, dataset.samples[i].aspects,dataset.samples[j].review, dataset.samples[j].aspects)
-                messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
+                gen_prompt = Prompts.combination_prompt(
+                    dataset.domain,
+                    dataset.samples[i].review,
+                    dataset.samples[i].aspects,
+                    dataset.samples[j].review,
+                    dataset.samples[j].aspects
+                    )
+                messages =[
+                        {
+                        "role":"system", 
+                        "content":Prompts.absa_description
+                        },
+                        {
+                            "role": "user", 
+                        "content": gen_prompt
+                        }
+                    ]
                 res=self.model.send_prompt(messages)
                 samples+=[res]
                 progress=self.__get_progress()+0.5/((len(dataset.samples)*len(dataset.samples)/2))
@@ -63,7 +106,6 @@ class CombinationGenerator:
                 json_data["samples"]+=[js["samples"]]
             except:
                 continue
-        print(json_data)
         all_samples=[]
         for sample in json_data["samples"]:
             if type(sample)==dict:
@@ -86,7 +128,6 @@ class CombinationGenerator:
                     else:
                         indexes=indexes[0]
                     new_sent=sample["aspect"][asp]["sentiment"].strip()[0].upper()+sample["aspect"][asp]["sentiment"].strip()[1:]
-                    print(new_sent)
                     if new_sent in Aspect.Sentiments:
                         new_asp=Aspect(sample["sentence"][indexes[0]:indexes[1]],new_sent)
                         new_aspects+=[new_asp]
@@ -105,8 +146,13 @@ class CombinationGenerator:
                 else:
                     indexes=indexes[0]
                 new_sent=sample["aspect"]["sentiment"].strip()[0].upper+sample["aspect"]["sentiment"].strip()[1:]
-                print(new_sent)
                 if new_sent in Aspect.Sentiments:
-                    new_asp=Aspect(sample["sentence"][indexes[0]:indexes[1]],new_sent)
-                self.combinations_dataset.add_sample(Sample(sample["sentence"],[new_asp]))
-            print(self.combinations_dataset)
+                    new_asp=Aspect(
+                        sample["sentence"][indexes[0]:indexes[1]],
+                        new_sent
+                        )
+                self.combinations_dataset.add_sample(
+                    Sample(
+                        sample["sentence"],
+                        [new_asp]
+                        ))

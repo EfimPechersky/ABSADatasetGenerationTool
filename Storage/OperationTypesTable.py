@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker,Mapped,mapped_column,relationship
 from Storage.Base import Base
 
 class OperationType(Base):
+    """Model for operation type info"""
     __tablename__ = 'operation_types'
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
