@@ -1,0 +1,643 @@
+<!-- create_project.html - Создание нового проекта -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создание проекта</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container-custom { max-width: 800px; margin: 0 auto; }
+        
+        /* Header styles */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #667eea;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+        .back-btn:hover {
+            background: #f0f0f0;
+            transform: translateX(-3px);
+        }
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .user-login {
+            color: #666;
+            font-weight: 500;
+        }
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+        
+        /* Form card styles */
+        .form-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h2 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 25px; }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #333; 
+            font-weight: 600; 
+            font-size: 14px;
+        }
+        label .required {
+            color: #ff4757;
+            margin-left: 4px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .categories-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .categories-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .categories-title { font-weight: 600; color: #333; font-size: 16px; }
+        .counter { font-size: 12px; color: #666; background: #e9ecef; padding: 4px 10px; border-radius: 20px; }
+        .categories-list { list-style: none; margin-bottom: 15px; max-height: 300px; overflow-y: auto; }
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .category-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .category-input:focus { outline: none; border-color: #667eea; }
+        .delete-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .delete-btn:hover { background: #ff3838; transform: scale(1.05); }
+        .delete-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .button-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-add { background: #28a745; color: white; flex: 1; }
+        .btn-add:hover:not(:disabled) { background: #218838; transform: translateY(-2px); }
+        .btn-add:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+        }
+        .btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .file-upload-area {
+            border: 2px dashed #e0e0e0;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .file-upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        .file-info { margin-top: 10px; font-size: 14px; color: #666; }
+        .examples-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .examples-preview h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .example-item {
+            font-size: 12px;
+            color: #666;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .warning { color: #ffc107; font-size: 12px; margin-top: 8px; }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        .error-global {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            .header-left {
+                flex-direction: column;
+                width: 100%;
+            }
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            .form-card {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container-custom">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <button class="back-btn" @click="goBack">← Назад к проектам</button>
+                <h1>📁 Создание проекта</h1>
+            </div>
+            <div class="user-info">
+                <span class="user-login">{{ userLogin }}</span>
+                <button class="logout-btn" @click="logout">Выйти</button>
+            </div>
+        </div>
+        
+        <!-- Form Card -->
+        <div class="form-card">
+            <h2>🚀 Новый проект</h2>
+            <p class="subtitle">Заполните информацию о проекте: название, предметную область, категории и загрузите примеры</p>
+            
+            <!-- Название проекта -->
+            <div class="form-group">
+                <label>Название проекта <span class="required">*</span></label>
+                <input type="text" v-model="projectName" placeholder="Введите название проекта">
+            </div>
+            
+            <!-- Предметная область -->
+            <div class="form-group">
+                <label>Предметная область <span class="required">*</span></label>
+                <input type="text" v-model="domain" placeholder="Например: Информационные технологии, Маркетинг, Образование, Медицина">
+            </div>
+            
+            <!-- Категории -->
+            <div class="categories-section">
+                <div class="categories-header">
+                    <span class="categories-title">📂 Категории <span class="required">*</span></span>
+                    <span class="counter">{{ categories.length }} / 10</span>
+                </div>
+                
+                <ul class="categories-list">
+                    <li v-for="(category, idx) in categories" :key="category.id" class="category-item">
+                        <input type="text" class="category-input" v-model="category.value" :placeholder="`Введите категорию ${idx + 1}`">
+                        <button type="button" class="delete-btn" @click="removeCategory(idx)" :disabled="categories.length <= 2">✖</button>
+                    </li>
+                </ul>
+                
+                <div class="button-group">
+                    <button type="button" class="btn btn-add" @click="addCategory" :disabled="categories.length >= 10">+ Добавить категорию</button>
+                </div>
+                <div class="warning" v-if="categories.length < 2">⚠️ Минимум 2 категории</div>
+            </div>
+            
+            <!-- Загрузка примеров -->
+            <div class="form-group">
+                <label>Примеры (CSV файл) <span class="required">*</span></label>
+                <div class="file-upload-area" @click="triggerFileInput">
+                    <i class="bi bi-cloud-upload" style="font-size: 48px; color: #667eea;"></i>
+                    <p v-if="!uploadedFile">Нажмите для выбора CSV файла</p>
+                    <p v-else style="color: #28a745;">✅ {{ uploadedFile.name }}</p>
+                    <div class="file-info">CSV файл с примерами (один столбец, без заголовка, разделитель ;)</div>
+                </div>
+                <input type="file" id="fileInput" style="display:none" accept=".csv" @change="handleFileSelect"/>
+                
+                <!-- Предпросмотр примеров -->
+                <div class="examples-preview" v-if="examples.length > 0">
+                    <h4>📄 Загружено примеров: {{ examples.length }}</h4>
+                    <div class="example-item" v-for="(example, idx) in examples.slice(0, 5)" :key="idx">
+                        {{ idx + 1 }}. {{ example.substring(0, 100) }}{{ example.length > 100 ? '...' : '' }}
+                    </div>
+                    <div v-if="examples.length > 5" style="color: #667eea; font-size: 12px; margin-top: 8px;">
+                        и еще {{ examples.length - 5 }} примеров...
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-submit" @click="createProject" :disabled="!isFormValid || isLoading">
+                <span v-if="isLoading" class="loading"></span>
+                <span v-else>✅ Создать проект</span>
+            </button>
+            
+            <div class="success-message" v-if="successMsg" style="display: block;">{{ successMsg }}</div>
+            <div class="error-global" v-if="errorMsg" style="display: block;">{{ errorMsg }}</div>
+        </div>
+    </div>
+</div>
+
+<script src="../Account/check-auth.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data: {
+        userLogin: '',
+        accessToken: '',
+        projectName: '',
+        domain: '',
+        categories: [{ id: 1, value: '' }, { id: 2, value: '' }],
+        nextCategoryId: 3,
+        uploadedFile: null,
+        examples: [],
+        isLoading: false,
+        successMsg: '',
+        errorMsg: '',
+        tokenCheckInterval: null
+    },
+    computed: {
+        isFormValid() {
+            return this.projectName.trim() !== '' &&
+                   this.domain.trim() !== '' && 
+                   this.categories.length >= 2 && 
+                   this.categories.length <= 10 &&
+                   this.categories.every(c => c.value.trim() !== '') &&
+                   this.examples.length > 0;
+        }
+    },
+    mounted() {
+        // Проверяем наличие токена напрямую из localStorage
+        const accountData = localStorage.getItem('account_info');
+        
+        if (!accountData) {
+            console.log('No account data, redirecting to login');
+            window.location.href = '../Account/Login.html';
+            return;
+        }
+        
+        try {
+            const account = JSON.parse(accountData);
+            
+            // Проверяем валидность токена
+            if (!account.access_token) {
+                console.log('No access token, redirecting to login');
+                window.location.href = '../Account/Login.html';
+                return;
+            }
+            
+            // Проверяем срок действия токена
+            const isValid = isTokenValid(account.access_token);
+            if (!isValid) {
+                console.log('Token expired, redirecting to login');
+                localStorage.removeItem('account_info');
+                window.location.href = '../Account/Login.html';
+                return;
+            }
+            
+            this.userLogin = account.login || '';
+            this.accessToken = account.access_token;
+            
+            console.log('User authenticated:', this.userLogin);
+            
+        } catch (e) {
+            console.error('Error parsing account info:', e);
+            window.location.href = '../Account/Login.html';
+            return;
+        }
+        
+        // Запускаем периодическую проверку токена
+        this.startTokenCheck();
+    },
+    
+    beforeDestroy() {
+        this.stopTokenCheck();
+    },
+    
+    methods: {
+        startTokenCheck() {
+            this.tokenCheckInterval = setInterval(() => {
+                const accountData = localStorage.getItem('account_info');
+                if (accountData) {
+                    try {
+                        const account = JSON.parse(accountData);
+                        if (!isTokenValid(account.access_token)) {
+                            console.log('Token expired during session');
+                            this.stopTokenCheck();
+                            this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                            setTimeout(() => {
+                                this.logout();
+                            }, 2000);
+                        }
+                    } catch (e) {
+                        console.error('Error checking token:', e);
+                    }
+                }
+            }, 300000); // 5 минут
+        },
+        
+        stopTokenCheck() {
+            if (this.tokenCheckInterval) {
+                clearInterval(this.tokenCheckInterval);
+                this.tokenCheckInterval = null;
+            }
+        },
+        
+        goBack() {
+            this.stopTokenCheck();
+            window.location.href = 'Projects.html';
+        },
+        
+        logout() {
+            this.stopTokenCheck();
+            localStorage.removeItem('account_info');
+            window.location.href = '../Account/Login.html';
+        },
+        
+        addCategory() {
+            if (this.categories.length < 10) {
+                this.categories.push({ id: this.nextCategoryId++, value: '' });
+            }
+        },
+        
+        removeCategory(index) {
+            if (this.categories.length > 2) {
+                this.categories.splice(index, 1);
+            }
+        },
+        
+        triggerFileInput() { 
+            document.getElementById('fileInput').click(); 
+        },
+        
+        handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            this.uploadedFile = file;
+            this.errorMsg = '';
+            this.examples = [];
+            
+            Papa.parse(file, {
+                delimiter: ";",
+                skipEmptyLines: true,
+                header: false,
+                encoding: "windows-1251",
+                complete: (results) => {
+                    let texts = _.flattenDeep(results.data).filter(text => text && text.trim().length > 0);
+                    if (texts.length === 0) {
+                        this.errorMsg = "Файл не содержит данных";
+                        this.uploadedFile = null;
+                        return;
+                    }
+                    this.examples = texts;
+                    this.successMsg = `Загружено ${texts.length} примеров`;
+                    setTimeout(() => { this.successMsg = ''; }, 3000);
+                },
+                error: (error) => {
+                    this.errorMsg = "Ошибка при загрузке файла: " + error.message;
+                    this.uploadedFile = null;
+                    this.examples = [];
+                }
+            });
+        },
+        
+        async createProject() {
+            if (!this.isFormValid) {
+                this.errorMsg = 'Пожалуйста, заполните все обязательные поля';
+                setTimeout(() => { this.errorMsg = ''; }, 3000);
+                return;
+            }
+            
+            // Проверяем токен перед отправкой
+            const accountData = localStorage.getItem('account_info');
+            if (!accountData) {
+                this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                setTimeout(() => this.logout(), 2000);
+                return;
+            }
+            
+            let token;
+            try {
+                const account = JSON.parse(accountData);
+                token = account.access_token;
+                if (!isTokenValid(token)) {
+                    this.errorMsg = 'Сессия истекла. Пожалуйста, войдите снова.';
+                    setTimeout(() => this.logout(), 2000);
+                    return;
+                }
+            } catch (e) {
+                this.errorMsg = 'Ошибка авторизации';
+                setTimeout(() => this.logout(), 2000);
+                return;
+            }
+            
+            this.isLoading = true;
+            this.errorMsg = '';
+            
+            const requestData = {
+                name: this.projectName.trim(),
+                domain: this.domain.trim(),
+                categories: this.categories.map(c => c.value.trim()),
+                examples: this.examples
+            };
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/create_project', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error('Unauthorized');
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'Success!' || result.status === 'Success' || result.status === 'success') {
+                    this.successMsg = result.message || 'Проект успешно создан! Перенаправление на страницу проектов...';
+                    
+                    // Очищаем форму
+                    this.projectName = '';
+                    this.domain = '';
+                    this.categories = [{ id: 1, value: '' }, { id: 2, value: '' }];
+                    this.uploadedFile = null;
+                    this.examples = [];
+                    
+                    setTimeout(() => {
+                        window.location.href = 'Projects.html';
+                    }, 2000);
+                } else {
+                    this.errorMsg = result.message || 'Ошибка при создании проекта';
+                }
+                
+            } catch (err) {
+                console.error('Create project error:', err);
+                
+                if (err.message === 'Unauthorized') {
+                    this.errorMsg = '❌ Сессия истекла. Пожалуйста, войдите заново.';
+                    setTimeout(() => this.logout(), 2000);
+                } else if (err.message.includes('Failed to fetch')) {
+                    this.errorMsg = '❌ Не удалось подключиться к серверу. Убедитесь, что сервер запущен.';
+                } else {
+                    this.errorMsg = `❌ Ошибка: ${err.message}`;
+                }
+                
+                setTimeout(() => { 
+                    if (this.errorMsg) this.errorMsg = ''; 
+                }, 5000);
+            } finally {
+                this.isLoading = false;
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>

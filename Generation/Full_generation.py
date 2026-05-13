@@ -5,24 +5,26 @@ from custom_exceptions import argument_exception, operation_exception
 from DatasetModels.AspectModel import Aspect
 from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
-from Storage.Process_statuses import ProcessStatuses
-"""Класс, отвечающий за полную генерацию нового датасета"""
+from Storage.DatabaseManager import DatabaseManager
 class SamplesGenerator:
     CombGen:CombinationGenerator
     PereGen:PerephraseGenerator
     __orig_dataset:Dataset
-    __code=0
     generated_dataset:Dataset
-    """Конструктор"""
-    def __init__(self,dataset:Dataset, code):
-        self.__code=code
-        self.CombGen=CombinationGenerator(code)
-        self.PereGen=PerephraseGenerator(code)
+    def __init__(self,dataset:Dataset, project_id):
+        """class for samples generation
+
+        Args:
+            dataset (Dataset): annotated dataset
+            project_id (int): project identificator
+        """        
+        self.CombGen=CombinationGenerator(project_id)
+        self.PereGen=PerephraseGenerator(project_id)
         self.orig_dataset=dataset
         self.generated_dataset=Dataset(dataset.domain)
-        self.__PS=ProcessStatuses()
+        self.DBManager=DatabaseManager()
+        self.project_id=project_id
 
-    """Вручную аннотированный датасет"""
     @property
     def orig_dataset(self):
         return self.__orig_dataset
@@ -33,12 +35,16 @@ class SamplesGenerator:
             raise argument_exception("Wrong type of dataset!")
         self.__orig_dataset=value
 
-    """Генерация датасета"""
     def generate_dataset(self):
+        """Dataset generation using two different methods
+
+        Raises:
+            argument_exception: Empty dataset
+        """        
         if self.__orig_dataset==[]:
             raise argument_exception("Empty dataset!")
         self.PereGen.generate_samples(self.__orig_dataset)
         self.CombGen.generate_samples(self.__orig_dataset)
         self.generated_dataset.samples=self.CombGen.combinations_dataset.samples+self.PereGen.perephrase_dataset.samples+Dataset.template_dataset().samples
-        self.__PS.change_dataset_generation_progress(self.__code,"Done", 1.0)
+        self.DBManager.change_operation_info(self.project_id, "Dataset generation", 2, 0.9)
     

@@ -5,26 +5,60 @@ from DatasetModels.AspectModel import Aspect
 from DatasetModels.SampleModel import Sample
 from DatasetModels.DatasetModel import Dataset
 from Model.LLM import LLM
-from Storage.Process_statuses import ProcessStatuses
+from Storage.DatabaseManager import DatabaseManager
 import re
-"""Класс, отвечающий за генерацию примеров при помощи метода перефразирования"""
 class PerephraseGenerator:
     __all_samples=[]
     __all_dasp=[]
     perephrase_dataset:Dataset
-    __PS:ProcessStatuses
+    DBManager:DatabaseManager
     model:LLM
-    """Конструктор"""
-    def __init__(self, code):
+
+    def __init__(self, project_id):
+        """Class for samples generation using perephrase method
+
+        Args:
+            project_id (int): project identificator
+        """        
         self.__all_samples=[]
         self.__all_dasp=[]
         self.perephrase_dataset=Dataset()
         self.model=LLM()
-        self.__PS=ProcessStatuses()
-        self.__code=code
+        self.DBManager=DatabaseManager()
+        self.__project_id=project_id
     
-    """Генерация примеров"""
+    def __change_progress(self, progress, status_id=2):
+        """Change progress of samples generation process
+
+        Args:
+            progress (float): progress value
+            status_id (int): identificator of operation status. Defaults to 2.
+        """ 
+        if status_id==None:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation",2, progress)
+        else:
+            self.DBManager.change_operation_info(self.__project_id, "Dataset generation", status_id, progress)
+    
+    def __get_progress(self):
+        """get opearion progress
+
+        Returns:
+            float: progress value
+        """  
+        res=self.DBManager.get_operation_info(self.__project_id, "Dataset generation")
+        return res["progress"]
+
+
     def get_samples(self,domain, sentence):
+        """Samples generation
+
+        Args:
+            domain (str): domain of reviews
+            sentence (str): sentence for reference
+
+        Returns:
+            list: samples
+        """        
         gen_prompt = Prompts.get_semantic_paraphrasing_prompt(domain,sentence)
         messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
         res = self.model.send_prompt(messages)
@@ -38,8 +72,17 @@ class PerephraseGenerator:
                 samples[i]=samples[i][samples[i].index(":")+2:samples[i].index("\n")]
         return samples
     
-    """Разметка примеров"""
     def get_aspects(self, source_sentence, sentences,aspects):
+        """Samples annotation
+
+        Args:
+            source_sentence (str): sentence, used for reference
+            sentences (list): generated sentences
+            aspects (dict): aspects in source centence
+
+        Returns:
+            list: generated aspects
+        """        
         gen_prompt = Prompts.get_aspect_annotation_prompt(source_sentence,sentences,aspects)
         messages =[{"role":"system", "content":Prompts.absa_description},{"role": "user", "content": gen_prompt}]
         res=self.model.send_prompt(messages)
@@ -51,7 +94,6 @@ class PerephraseGenerator:
                 continue
             new_asp+=[asp[7:]]
         aspects=new_asp.copy()
-        print(aspects)
         for i in range(0,len(aspects)):
             dasp+=[{}]
             aspects[i]=aspects[i][aspects[i].index(":")+2:]
@@ -62,6 +104,14 @@ class PerephraseGenerator:
     
     """Генерация датасета"""
     def generate_samples(self,dataset:Dataset):
+        """Generate annotated samples
+
+        Args:
+            dataset (Dataset): annotated dataset
+
+        Raises:
+            argument_exception: Wrong type of dataset
+        """        
         if not isinstance(dataset, Dataset):
             raise argument_exception("Wrong type of dataset")
         self.perephrase_dataset.domain=dataset.domain
@@ -74,8 +124,8 @@ class PerephraseGenerator:
             if len(gen_samples)==len(gen_aspects):
                 self.__all_samples+=gen_samples
                 self.__all_dasp+=gen_aspects
-            progress=self.__PS.get_dataset_generation_progress(self.__code)["progress"]+0.5/len(dataset.samples)
-            self.__PS.change_dataset_generation_progress(self.__code,"In progress", progress)
+            progress=self.__get_progress()+0.5/len(dataset.samples)
+            self.__change_progress(progress)
         for ind in range(0,len(self.__all_samples)):
             new_aspects=[]
             try:

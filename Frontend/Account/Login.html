@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <title>Вход</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .register-link a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Вход</h1>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Логин</label>
+                <input type="text" id="login" name="login" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" id="submitBtn">Войти</button>
+        </form>
+        <div id="message" class="message"></div>
+        <div class="register-link">
+            Нет аккаунта? <a href="Registration.html">Зарегистрироваться</a>
+        </div>
+    </div>
+
+    <script src="check-auth.js"></script>
+    <script>
+        async function hashPassword(password) {
+            const hashed = CryptoJS.SHA256(password).toString();
+            return hashed;
+        }
+        // Проверяем, сохранялся ли токен при обновлении страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = getAuthToken();
+            if (token) {
+                console.log('Уже авторизован');
+                // Можно перенаправить на страницу проектов
+                window.location.href = '../Projects/Projects.html';
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const login = document.getElementById('login').value.trim();
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (!login || !password) {
+                showMessage('Заполните все поля', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Вход...';
+            
+            try {
+                const hashedPassword = await hashPassword(password);
+
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ login, password: hashedPassword })
+                });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Неверный логин или пароль');
+                    } else if (response.status === 403) {
+                        throw new Error('Доступ запрещен');
+                    } else {
+                        throw new Error(`Ошибка сервера: ${response.status}`);
+                    }
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'Success') {
+                    // Используем функцию parseJWT из check-auth.js
+                    const decodedToken = parseJWT(data.message);
+                    
+                    const account_info = {
+                        "access_token": data.message,
+                        "login": login,
+                        "expires_at": decodedToken?.exp,
+                        "user_id": decodedToken?.sub
+                    };
+                    
+                    localStorage.setItem('account_info', JSON.stringify(account_info));
+                    showMessage('Вход выполнен успешно! Перенаправление...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = '../Projects/Projects.html';
+                    }, 1500);
+                } else {
+                    showMessage(data.message || 'Ошибка входа', 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                
+                if (error.message.includes('Failed to fetch')) {
+                    showMessage('Не удается подключиться к серверу. Проверьте, запущен ли сервер.', 'error');
+                } else if (error.message.includes('401') || error.message.includes('403')) {
+                    showMessage('Неверный логин или пароль', 'error');
+                } else {
+                    showMessage(error.message || 'Ошибка при выполнении запроса', 'error');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Войти';
+            }
+        });
+        
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Добавляем возможность войти по Enter
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('submitBtn').click();
+            }
+        });
+        
+        // Очистка сообщения при вводе данных
+        document.getElementById('login').addEventListener('input', () => {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv.style.display === 'block') {
+                messageDiv.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('password').addEventListener('input', () => {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv.style.display === 'block') {
+                messageDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
